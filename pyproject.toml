@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "django-modular"
+version = "0.1.0"
+description = "Modular Django project with src layout"
+requires-python = ">=3.12"
+dependencies = [
+    "Django>=5.0",
+    "djangorestframework>=3.15",
+    "django-environ>=0.11.2",
+    "psycopg2-binary>=2.9",
+]
+
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["src"]
+testpaths = ["src/apps"]
+
+addopts = [
+    "--strict-markers",
+    "--disable-warnings"
+]
+
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+]
+
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

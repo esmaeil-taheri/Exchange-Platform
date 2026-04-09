@@ -1,0 +1,26 @@
+default_stages: [pre-commit]
+exclude: '^(venv|\.venv|env|\.env|build|dist|__pycache__)/'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-yaml
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.2
+    hooks:
+      - id: ruff-check
+        name: ruff-linter
+        types_or: [python, pyi]
+        args: [--fix]
+
+      - id: ruff-format
+        name: ruff-formatter
+        types_or: [python, pyi]
+
+      - id: ruff
+        name: ruff-import-sort
+        args: ["--select", "I", "--fix"]
+        types_or: [python, pyi]

@@ -1,0 +1,82 @@
+services:
+  db:
+    image: postgres:16
+    container_name: django_postgres
+    restart: unless-stopped
+    env_file:
+    - .env
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - django_postgres_data:/var/lib/postgresql/data
+    ports:
+      - ${DATABASE_PORT}:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - django_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: django_backend
+    restart: unless-stopped
+    command: python manage.py runserver 0.0.0.0:8000
+    # command: gunicorn src.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120 --access-logfile - --error-logfile -
+    env_file:
+      - .env
+    environment:
+      HOME: /tmp
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      ACCESS_TOKEN_LIFETIME_DAYS: ${ACCESS_TOKEN_LIFETIME_DAYS}
+      REFRESH_TOKEN_LIFETIME_DAYS: ${REFRESH_TOKEN_LIFETIME_DAYS}
+    ports:
+      - "0.0.0.0:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - django_network
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/main-service/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
+
+  nginx:
+    image: nginx:mainline-alpine3.23
+    container_name: django_nginx
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    # depends_on:
+    #   backend:
+    #     condition: service_healthy
+    networks:
+      - django_network
+
+volumes:
+  django_postgres_data:
+
+networks:
+  django_network:
+    driver: bridge
