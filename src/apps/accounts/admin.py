@@ -1,7 +1,21 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
+from apps.admins.models.site_admin import SiteAdmin
+from apps.customers.models.customer import Customer
+
 from .models import CustomUser
+
+class CustomerInlines(admin.StackedInline):
+    model = Customer
+    verbose_name = 'Customer Profile'
+    verbose_name_plural = 'Customer Profile'
+
+
+class SiteAdminInlines(admin.StackedInline):
+    model = SiteAdmin
+    verbose_name = 'Admin Profile'
+    verbose_name_plural = 'Admin Profile'
 
 
 @admin.register(CustomUser)
@@ -14,8 +28,8 @@ class CustomUserAdmin(UserAdmin):
                 'classes': ('wide', ),
                 'fields': (
                     'username', 'usable_password', 'password1', 'password2',
-                    'phone_number', 'national_id', 'is_suspended', 'otp',
-                    'otp_expires_timestamp', 'last_login_timestamp', 'last_ip_address',
+                    'phone_number', 'national_id', 'is_suspended',
+                    'last_login_jalali', 'last_ip_address',
                     'is_2fa_enabled', 'requires_2fa', 'totp_secret',
                 )
             }
@@ -28,10 +42,10 @@ class CustomUserAdmin(UserAdmin):
          'is_superuser', 'groups', 'user_permissions')}),
         ('Authentication', {
             'fields': (
-                'registration',
-                'shamsi_last_login', 'shamsi_otp_expires', 'last_ip_address',
-                'is_suspended', 'phone_number_ownership',
-                'otp', 'otp_expires_timestamp', 'last_login_timestamp',
+                'created_at_jalali',
+                'last_login_jalali',
+                'last_ip_address',
+                'is_suspended',
                 'is_2fa_enabled', 'requires_2fa', 'totp_secret',
 
             ) 
@@ -41,9 +55,8 @@ class CustomUserAdmin(UserAdmin):
     )
 
     readonly_fields = [
-        'registration',
-        'shamsi_last_login',
-        'shamsi_otp_expires',
+        'created_at_jalali',
+        'last_login_jalali',
         'last_ip_address',
         'totp_secret'
     ]
@@ -51,7 +64,9 @@ class CustomUserAdmin(UserAdmin):
     list_display_links = ['id', 'national_id']
 
     list_display = ('id', '__str__', 'phone_number', 'national_id', 'is_2fa_enabled',
-                    'is_suspended', 'phone_number_ownership', 'last_ip_address', 'otp', 'shamsi_last_login', )
+                    'is_suspended', 'last_ip_address', 'last_login_jalali', )
+    
+    inlines = [CustomerInlines, SiteAdminInlines]
     
     search_fields = ['id', 'national_id', 'phone_number', 'first_name', 'last_name']
     
