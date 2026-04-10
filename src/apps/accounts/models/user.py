@@ -10,7 +10,7 @@ class CustomUser(AbstractUser):
     last_name = models.CharField(max_length=50, default='User', verbose_name="Last Name")
 
     phone_number = models.CharField(max_length=11, unique=True, verbose_name='Phone Number', default='-')
-    national_id = models.CharField(max_length=10, unique=True, verbose_name="National ID", default='-')
+    national_id = models.CharField(max_length=10, verbose_name="National ID", default='-')
 
     is_suspended = models.BooleanField(default=False, verbose_name='Is Suspended')
 
