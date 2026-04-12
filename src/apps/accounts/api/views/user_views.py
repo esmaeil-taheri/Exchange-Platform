@@ -1,34 +1,40 @@
-from django.http import Http404
-
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
-from apps.accounts.api.serializers.user_serializers import RegisterSerializer, UserDetailSerializer
-from apps.accounts.selectors.user_selectors import UserSelector
-from apps.accounts.exceptions.user_exceptions import RegistrationDisabled, UsernameAlreadyExists
+from apps.accounts.api.serializers.user_serializers import (
+    MessageResponseSerializer, Change2FAStatusSerializer, 
+    LoginRegisterSerializer, LoginRegisterVerifySerializer,
+    OtpSendResponseSerializer, LoginRegisterVerifyResponseSerializer, 
+    TwoFaUriSerializer, Verify2faAccessSerializer
+)
 from apps.core.exceptions.open_api import ErrorSerializer
+from apps.accounts.services.user_services import UserService
 
 
-class RegisterApiView(APIView):
-    """Handle user registration."""
+class LoginRegisterApiView(APIView):
+    """Handle user login."""
 
     @extend_schema(
+        summary="Login with OTP",
         tags=['Accounts'],
-        request=RegisterSerializer,
+        request=LoginRegisterSerializer,
+        description="Send OTP to user's phone",
         responses={
-            201: OpenApiResponse(
-                response=UserDetailSerializer,
-                description="User registered successfully.",
+            200: OpenApiResponse(
+                response=OtpSendResponseSerializer,
+
                 examples=[
                     OpenApiExample(
-                        name="Successful Register",
+                        name="Action was Successfull",
                         value={
-                            "id": 1,
-                            "username": "test",
-                            "email": "test@email.com"
+                            "message": "code sent successfully",
+                            "data": {
+                                "phone_number": "09121110022"
+                            }
                         }
                     )
                 ]
@@ -47,33 +53,40 @@ class RegisterApiView(APIView):
     )
 
     def post(self, request, *args, **kwargs):
-        serializer = RegisterSerializer(data=request.data)
+        serializer = LoginRegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+
+        data = serializer.save()
+
         return Response(
-            serializer.to_representation(user), 
-            status=status.HTTP_201_CREATED
+            data,
+            status=status.HTTP_200_OK
         )
         
 
-
-class ProfileApiView(APIView):
-
-    permission_classes = [IsAuthenticated]
+class LoginRegisterVerifyApiView(APIView):
+    """Handle user login verification."""
 
     @extend_schema(
+        summary="Login Verify OTP",
         tags=['Accounts'],
+        request=LoginRegisterVerifySerializer,
+        description="Authenticate user and returns JWT token",
         responses={
             200: OpenApiResponse(
-                response=UserDetailSerializer,
-                description="User Retrieved successfully.",
+                response=LoginRegisterVerifyResponseSerializer,
+                description="Login Was Successfull.",
                 examples=[
                     OpenApiExample(
-                        name="Successful Retrieve",
+                        name="Successfull Login",
                         value={
-                            "id": 1,
-                            "username": "test",
-                            "email": "test@email.com"
+                            "message": "Login Was Successfull",
+                            "data": {
+                                "access_token": "eyJhbGc...",
+                                "refresh_token": "eyJhbGc...",
+                                "first_time_login": True,
+                                "two_fa_enabled": False
+                            }
                         }
                     )
                 ]
@@ -91,8 +104,128 @@ class ProfileApiView(APIView):
         }
     )
 
-    def get(self, request, *args, **kwargs):
-        user = UserSelector.get_user_by_id(user_id=request.user.id)
-        serializer = UserDetailSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    def post(self, request, *args, **kwargs):
+        serializer = LoginRegisterVerifySerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.save()
         
+        return Response(
+            data, status=status.HTTP_200_OK
+        )
+
+
+class Get2FAUriApiView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Get 2FA setup URI",
+        tags=['Accounts'],
+        description="Returns the secret and URI needed to configure 2FA in authenticator apps.",
+        responses=TwoFaUriSerializer
+    )
+    def get(self, request, *args, **kwargs):
+        data = UserService.setup_2fa(request=request)
+        serializer = TwoFaUriSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class Verify2FAAccessApiView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+    summary="Send OTP for Change 2FA Status",
+    tags=['Accounts'],
+    description="Send OTP to user's phone to change 2fa status",
+    request=Verify2faAccessSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=OtpSendResponseSerializer,
+                description="Login Was Successfull.",
+                examples=[
+                    OpenApiExample(
+                        name="Action Was Successfull",
+                        value={
+                            "message": "code sent successfully",
+                            "data": {
+                                "phone_number": "09121110022"
+                            }
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=ErrorSerializer,
+                description="Error response (400, 401, 403, 409, 500)",
+                examples=[
+                    OpenApiExample(
+                        name="Not Authenticated",
+                        value={"detail": "Authentication credentials were not provided."}
+                    )
+                ]
+            )
+        }
+    )
+    
+    def post(self, request, *args, **kwargs):
+        serializer = Verify2faAccessSerializer(data={}, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+
+        return Response(
+            data, status=status.HTTP_200_OK
+        )
+
+
+class Change2FAStatusApiView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+    summary="Change 2FA Status",
+    tags=['Accounts'],
+    description="Enable/Disable 2FA",
+    request=Change2FAStatusSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=MessageResponseSerializer,
+                description="Login Was Successfull.",
+                examples=[
+                    OpenApiExample(
+                        name="Action Was Successfull",
+                        value={
+                            "message": "Status changed successfully"
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=ErrorSerializer,
+                description="Error response (400, 401, 403, 409, 500)",
+                examples=[
+                    OpenApiExample(
+                        name="Not Authenticated",
+                        value={"detail": "Authentication credentials were not provided."}
+                    )
+                ]
+            )
+        }
+    )
+    
+    def post(self, request, *args, **kwargs):
+        serializer = Change2FAStatusSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.save()
+
+        serializer = MessageResponseSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
+        return Response(
+            serializer.data, status=status.HTTP_200_OK
+        )

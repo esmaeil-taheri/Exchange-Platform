@@ -3,6 +3,7 @@ from typing import Optional
 from rest_framework.exceptions import NotFound
 
 from apps.accounts.models import CustomUser
+from apps.core.utils.security_utils import get_totp_uri
 
 class UserSelector:
     """Encapsulate all 'read' operations related to User."""
@@ -17,3 +18,19 @@ class UserSelector:
         if not user:
             raise NotFound("User not found")
         return user
+    
+    @staticmethod
+    def get_user_2fa_uri(user_id: int) -> dict:
+
+        user = CustomUser.objects.filter(id=user_id).only(
+            "totp_secret", "national_id").first()
+
+        uri = get_totp_uri(
+            secret=user.totp_secret,
+            identifier=user.national_id
+        )
+
+        return {
+            "setup_key": user.totp_secret,
+            "uri": uri
+        }

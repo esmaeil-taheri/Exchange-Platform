@@ -3,23 +3,46 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from apps.accounts.exceptions.user_exceptions import (
-    RegistrationDisabled,
-    UsernameAlreadyExists,
+    InvalidTwoFactorCode,
+    OtpAlreadySent,
+    FailedToSendOtp,
+    InvalidOtp,
+    TwoFactorAlreadyDisabled,
+    TwoFactorAlreadyEnabled
 )
+from apps.core.exceptions.base import ActionDisabled
+
 
 def custom_exception_handler(exc, context):
-    response = exception_handler(exc, context)
 
-    if isinstance(exc, RegistrationDisabled):
-        return Response(
-            {"detail": str(exc)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    if isinstance(exc, ActionDisabled):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
 
-    if isinstance(exc, UsernameAlreadyExists):
-        return Response(
-            {"detail": str(exc)},
-            status=status.HTTP_409_CONFLICT
-        )
+    if isinstance(exc, OtpAlreadySent):
+        return _error_response(exc, status.HTTP_429_TOO_MANY_REQUESTS)
 
-    return response
+    if isinstance(exc, InvalidOtp):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
+    if isinstance(exc, TwoFactorAlreadyEnabled):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+
+    if isinstance(exc, TwoFactorAlreadyDisabled):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
+    if isinstance(exc, InvalidTwoFactorCode):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+
+    if isinstance(exc, FailedToSendOtp):
+        return _error_response(exc, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    return exception_handler(exc, context)
+
+
+def _error_response(exc, status_code):
+    return Response(
+        {
+            "message": str(exc),
+        },
+        status=status_code,
+    )

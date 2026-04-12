@@ -1,21 +1,25 @@
-from django.core.mail import send_mail
 from django.dispatch import receiver
 
 from apps.accounts.services.user_services import user_registered
-from django.conf import settings
+from apps.core.services.sms.sms_ir import SmsIrProvider
 
 
 @receiver(user_registered)
-def send_welcome_email(sender, user, **kwargs):
+def send_welcome_sms(sender, user, **kwargs):
     """Send a welcome email after successful registration."""
 
-    subject = "Welcome to Our Platform!"
     message = f"""
-        Hi {user.username},
+        Hi,
 
         Welcome to our platform! We’re glad to have you onboard.
 
         Best regards,
         Your Team
     """
-    print(subject,'\n', message)
+    # provider = SmsIrProvider()
+    # provider.send_message(
+    #     message=message, 
+    #     phone_number=user.phone_number
+    # )
+    
+    print(message)

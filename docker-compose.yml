@@ -22,6 +22,26 @@ services:
     networks:
       - django_network
 
+  redis:
+    image: redis:7
+    container_name: django_redis
+    restart: always
+
+    env_file:
+      - .env
+
+    command: ["redis-server", "--requirepass", "${REDIS_PASS}"]
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASS}", "PING"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+    networks:
+      - django_network
+
   backend:
     build:
       context: .
@@ -48,6 +68,8 @@ services:
       - "0.0.0.0:8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - .:/app

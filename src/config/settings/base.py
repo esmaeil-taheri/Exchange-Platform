@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     "drf_spectacular",
 
     "apps.accounts.apps.AccountsConfig",
-    "apps.site_setting.apps.SiteSettingConfig"
+    "apps.site_setting.apps.SiteSettingConfig",
+    "apps.customers.apps.CustomersConfig",
+    "apps.admins.apps.SiteAdminsConfig"
 ]
 
 MIDDLEWARE = [
@@ -87,6 +89,29 @@ DATABASES = {
     )
 }
 
+# Cache
+REDIS_HOST = config("REDIS_HOST")
+REDIS_PORT = config("REDIS_PORT", cast=int)
+REDIS_DB = config("REDIS_DB", cast=int)
+REDIS_PASS = config("REDIS_PASS", default="")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://:{REDIS_PASS}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+CACHES["otp"] = {
+    "BACKEND": "django_redis.cache.RedisCache",
+    "LOCATION": f"redis://:{REDIS_PASS}@{REDIS_HOST}:{REDIS_PORT}/1",
+    "OPTIONS": {
+        "CLIENT_CLASS": "django_redis.client.DefaultClient",
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -112,7 +137,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Tehran'
 
 USE_I18N = True
 
@@ -138,9 +163,10 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
+# Authentication model
 AUTH_USER_MODEL = "accounts.CustomUser"
 
+# Rest framework settings
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.core.exceptions.handler.custom_exception_handler",
@@ -149,8 +175,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (),
 }
 
+# JWT
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -158,7 +185,7 @@ SIMPLE_JWT = {
     "SIGNING_KEY": config("SECRET_KEY"),
 }
 
-
+# Drf spectacular
 SPECTACULAR_SETTINGS = {
     'TITLE': 'My API',
     'DESCRIPTION': 'Project API docs',
@@ -182,3 +209,8 @@ SPECTACULAR_SETTINGS = {
         {"name": "Accounts", "description": "User-related endpoints"}
     ]
 }
+
+# sms provider
+SMS_IR_API_KEY = config('SMS_IR_API_KEY') #SND
+SEND_LOGIN_OTP_TEMPLATE_ID = config('SEND_LOGIN_OTP_TEMPLATE_ID')
+SEND_MESSAGE_TEMPLATE_ID = config('SEND_MESSAGE_TEMPLATE_ID')

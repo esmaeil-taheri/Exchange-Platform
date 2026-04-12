@@ -17,9 +17,5 @@ urlpatterns = [
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     
     # Accounts
-    path('api/accounts/', include('apps.accounts.urls')), 
-    
-    # JWT token urls
-    path("api/v1/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("api/v1/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path('api/v1/authentication/', include('apps.accounts.urls')),
 ]

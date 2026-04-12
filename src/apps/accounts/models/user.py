@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-import pyotp
 
 from apps.core.utils.date_time_utils import to_jalali
 
@@ -36,16 +35,6 @@ class CustomUser(AbstractUser):
     @property
     def last_login_jalali(self):
         return to_jalali(self.last_login)
-    
-    def get_totp_uri(self):
-        return pyotp.TOTP(self.totp_secret).provisioning_uri(
-            name=self.national_id,
-            issuer_name="EsiGold"
-        )
-    
-    def verify_totp(self, code):
-        totp = pyotp.TOTP(self.totp_secret)
-        return totp.verify(code)
     
     def __str__(self):
         return f'{self.first_name} {self.last_name}'

@@ -2,8 +2,16 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from apps.admins.models.site_admin import SiteAdmin
+from apps.customers.models.customer import Customer
+
 
 from .models import CustomUser
+
+
+class CustomerInlines(admin.StackedInline):
+    model = Customer
+    verbose_name = 'Customer Profile'
+    verbose_name_plural = 'Customer Profile'
 
 
 class SiteAdminInlines(admin.StackedInline):
@@ -60,7 +68,7 @@ class CustomUserAdmin(UserAdmin):
     list_display = ('id', '__str__', 'phone_number', 'national_id', 'is_2fa_enabled',
                     'is_suspended', 'last_ip_address', 'last_login_jalali', )
     
-    inlines = [SiteAdminInlines]
+    inlines = [CustomerInlines, SiteAdminInlines]
     
     search_fields = ['id', 'national_id', 'phone_number', 'first_name', 'last_name']
     
