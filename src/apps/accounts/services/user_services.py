@@ -23,6 +23,7 @@ from apps.accounts.selectors.user_selectors import UserSelector
 
 
 user_registered = Signal()
+login_detected = Signal()
 
 
 # define cache client
@@ -100,6 +101,7 @@ class UserService:
                 user.last_login = timezone.now()
                 user.last_ip_address = get_client_ip(request)
                 user.save(update_fields=['last_login', 'last_ip_address'])
+                login_detected.send(sender=CustomUser, user=user)
 
             refresh = RefreshToken.for_user(user)
             

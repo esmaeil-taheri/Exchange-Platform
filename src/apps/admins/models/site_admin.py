@@ -15,7 +15,7 @@ class SiteAdmin(models.Model):
     position = models.CharField(max_length=50, verbose_name='Position')
     about = models.TextField(verbose_name='About', blank=True)
     personal_code = models.CharField(max_length=4, verbose_name='Personal Code', unique=True)
-    profile_pic = models.URLField(verbose_name='Profile Picture')
+    profile_pic = models.URLField(verbose_name='Profile Picture', default='-')
 
     allowed_ips = models.ManyToManyField('admins.TrustedIp', blank=True, verbose_name='Allowed IPs')
 

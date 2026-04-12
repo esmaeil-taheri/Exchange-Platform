@@ -41,7 +41,8 @@ INSTALLED_APPS = [
     "apps.accounts.apps.AccountsConfig",
     "apps.site_setting.apps.SiteSettingConfig",
     "apps.customers.apps.CustomersConfig",
-    "apps.admins.apps.SiteAdminsConfig"
+    "apps.admins.apps.SiteAdminsConfig",
+    "apps.notifications.apps.NotificationsConfig"
 ]
 
 MIDDLEWARE = [

@@ -10,7 +10,11 @@ from apps.accounts.exceptions.user_exceptions import (
     TwoFactorAlreadyDisabled,
     TwoFactorAlreadyEnabled
 )
+
 from apps.core.exceptions.base import ActionDisabled
+from apps.notifications.exceptions.notification_exceptions import (
+    NotificationAlreadyRead, NotificationNotFound
+)
 
 
 def custom_exception_handler(exc, context):
@@ -32,6 +36,12 @@ def custom_exception_handler(exc, context):
     
     if isinstance(exc, InvalidTwoFactorCode):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
+    if isinstance(exc, NotificationAlreadyRead):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
+    if isinstance(exc, NotificationNotFound):
+        return _error_response(exc, status.HTTP_404_NOT_FOUND)
 
     if isinstance(exc, FailedToSendOtp):
         return _error_response(exc, status.HTTP_503_SERVICE_UNAVAILABLE)
