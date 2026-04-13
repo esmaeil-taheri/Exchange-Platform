@@ -3,10 +3,6 @@ from django.conf import settings
 
 
 class Notification(models.Model):
-    """
-    رکورد اصلی اعلان. برای اعلان عمومی فقط یک رکورد ساخته می‌شود.
-    برای اعلان کاربرمحور: user مقدار می‌گیرد.
-    """
 
     TYPE_CHOICES = [
         ('public', 'Public'),

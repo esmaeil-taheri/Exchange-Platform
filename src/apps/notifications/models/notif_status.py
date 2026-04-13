@@ -3,10 +3,6 @@ from django.db import models
 from django.conf import settings
 
 class UserNotificationStatus(models.Model):
-    """
-    وضعیت خوانده‌شدن هر اعلان برای هر کاربر.
-    فقط زمانی رکورد ساخته می‌شود که کاربر نوتیف را بخواند یا وارد لیست unread شود.
-    """
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
