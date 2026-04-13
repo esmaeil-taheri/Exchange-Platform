@@ -19,3 +19,4 @@ venv/
 .env.*
 .pytest_cache/
 db.sqlite3
+mg/

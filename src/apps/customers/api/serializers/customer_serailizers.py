@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.customers.services.kyfc_services import KycSerivce
+from apps.customers.services.kyc_services import KycService
 
 
 class CustomerIdentityInquirySerializer(serializers.Serializer):
@@ -12,7 +12,7 @@ class CustomerIdentityInquirySerializer(serializers.Serializer):
     def create(self, validated_data):
         request = self.context['request']
         user = request.user
-        return KycSerivce.get_customer_identity_inquiry(
+        return KycService.get_customer_identity_inquiry(
             user=user, first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
             national_id=validated_data['national_id'],

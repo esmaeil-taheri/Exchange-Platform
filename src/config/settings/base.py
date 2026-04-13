@@ -207,7 +207,9 @@ SPECTACULAR_SETTINGS = {
     },
 
     "TAGS": [
-        {"name": "Accounts", "description": "User-related endpoints"}
+        {"name": "Accounts", "description": "User-related endpoints"},
+        {"name": "Notifications", "description": "Notification-related endpoints"},
+        {"name": "Customers", "description": "Customer-related endpoints"},
     ]
 }
 
@@ -219,3 +221,9 @@ SEND_MESSAGE_TEMPLATE_ID = config('SEND_MESSAGE_TEMPLATE_ID')
 # Inquiry service
 INQUIRY_SERVICE_USERNAME = config('INQUIRY_SERVICE_USERNAME')
 INQUIRY_SERVICE_PASSWORD = config('INQUIRY_SERVICE_PASSWORD')
+
+# Object storage credentials
+OBJECT_STORAGE_ACCESS_KEY = config('OBJECT_STORAGE_ACCESS_KEY')
+OBJECT_STORAGE_SECRET_KEY = config('OBJECT_STORAGE_SECRET_KEY')
+OBJECT_STORAGE_ENDPOINT_URL = config('OBJECT_STORAGE_ENDPOINT_URL')
+OBJECT_STORAGE_SECURE = False  # True when https

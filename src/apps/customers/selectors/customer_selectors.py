@@ -6,7 +6,7 @@ class CustomerSelector:
     @staticmethod
     def get_kyc_status(*, user: CustomUser) -> dict:
 
-        customer = Customer.objects.prefetch_related('kyc').get(user_id=user.id)
+        customer = Customer.objects.select_related('kyc').get(user_id=user.id)
 
         return {
             "message": 'اطلاعات با موفقیت دریافت شد',
