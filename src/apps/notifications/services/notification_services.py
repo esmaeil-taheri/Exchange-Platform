@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
+from django.db import transaction
 
 from apps.notifications.models.notif_template import NotificationTemplate
 from apps.notifications.models.notification import Notification
@@ -18,22 +19,23 @@ class NotificationService:
         for key, value in context.items():
             body = body.replace(f'{{{{{key}}}}}', str(value))
 
-        notif = Notification.objects.create(
-            user=user,
-            template=template,
-            type='user' if user else 'public',
-            title=template.title,
-            body=body,
-            category=template.category,
-            severity=template.severity
-        )
-
-        if user:
-            UserNotificationStatus.objects.create(
+        with transaction.atomic():
+            notif = Notification.objects.create(
                 user=user,
-                notification=notif,
-                is_read=False
+                template=template,
+                type='user' if user else 'public',
+                title=template.title,
+                body=body,
+                category=template.category,
+                severity=template.severity
             )
+
+            if user:
+                UserNotificationStatus.objects.create(
+                    user=user,
+                    notification=notif,
+                    is_read=False
+                )
 
         return notif
     
