@@ -1,7 +1,8 @@
 from django.contrib import admin
 
 from apps.customers.models.customer import Customer
-from apps.customers.models.kyc import Kyc, KycDocument
+from apps.customers.models.kyc import Kyc
+from apps.customers.models.kyc_document import KycDocument
 
 
 class KycInlines(admin.StackedInline):

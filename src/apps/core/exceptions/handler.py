@@ -15,6 +15,7 @@ from apps.core.exceptions.base import ActionDisabled
 from apps.notifications.exceptions.notification_exceptions import (
     NotificationAlreadyRead, NotificationNotFound
 )
+from apps.customers.exceptions.customer_exceptions import CustomerAlreadyVerified
 
 
 def custom_exception_handler(exc, context):
@@ -38,6 +39,9 @@ def custom_exception_handler(exc, context):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
     
     if isinstance(exc, NotificationAlreadyRead):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
+    if isinstance(exc, CustomerAlreadyVerified):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
     
     if isinstance(exc, NotificationNotFound):
