@@ -16,6 +16,7 @@ from apps.notifications.exceptions.notification_exceptions import (
     NotificationAlreadyRead, NotificationNotFound
 )
 from apps.customers.exceptions.customer_exceptions import CustomerAlreadyUploadedDoc, CustomerAlreadyVerified
+from apps.customers.exceptions.bank_card_exceptions import BankCardNotFound, BankCardAlreadyExists
 
 
 def custom_exception_handler(exc, context):
@@ -46,6 +47,12 @@ def custom_exception_handler(exc, context):
     
     if isinstance(exc, CustomerAlreadyUploadedDoc):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
+    if isinstance(exc, BankCardAlreadyExists):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
+    if isinstance(exc, BankCardNotFound):
+        return _error_response(exc, status.HTTP_404_NOT_FOUND)
     
     if isinstance(exc, NotificationNotFound):
         return _error_response(exc, status.HTTP_404_NOT_FOUND)

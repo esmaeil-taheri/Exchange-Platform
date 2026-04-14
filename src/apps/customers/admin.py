@@ -3,6 +3,7 @@ from django.contrib import admin
 from apps.customers.models.customer import Customer
 from apps.customers.models.kyc import Kyc
 from apps.customers.models.kyc_document import KycDocument
+from apps.customers.models.bank_card import BankCard
 
 
 class KycInlines(admin.StackedInline):
@@ -83,3 +84,11 @@ class KycAdmin(admin.ModelAdmin):
     readonly_fields = ['submitted_at', 'reviewed_at']
 
     inlines = [KycDocumentInlines]
+
+
+@admin.register(BankCard)
+class BankCardAdmin(admin.ModelAdmin):
+    list_display = ['card_number', 'bank_name', 'card_ownership', 'owner_information', 'is_verified', 'created_at_jalali']
+
+    read_only_fields = ['modified_by']
+    
