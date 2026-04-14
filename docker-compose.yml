@@ -82,6 +82,62 @@ services:
     #   retries: 3
     #   start_period: 40s
 
+  celery:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    command: celery -A config worker --loglevel=INFO -E
+    environment:
+      - PYTHONPATH=/app/src
+      - DJANGO_SETTINGS_MODULE=config.settings.base
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - backend
+
+    networks:
+      - django_network
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    command: celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      - PYTHONPATH=/app/src
+      - DJANGO_SETTINGS_MODULE=config.settings.base
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - backend
+    networks:
+      - django_network
+
+  flower:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: django_flower
+    command: celery -A config flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      PYTHONPATH: /app/src
+      DJANGO_SETTINGS_MODULE: config.settings.base
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - celery
+    networks:
+      - django_network
+
   nginx:
     image: nginx:mainline-alpine3.23
     container_name: django_nginx

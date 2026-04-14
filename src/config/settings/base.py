@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "drf_spectacular",
+    "django_celery_beat", 
 
     "apps.accounts.apps.AccountsConfig",
     "apps.site_setting.apps.SiteSettingConfig",
@@ -80,14 +81,25 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     "default": dj_database_url.config(
+#         default=config(
+#             "DATABASE_URL",
+#             default="sqlite:///db.sqlite3",
+#         ),
+#         conn_max_age=600,
+#     )
+# }
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=config(
-            "DATABASE_URL",
-            default="sqlite:///db.sqlite3",
-        ),
-        conn_max_age=600,
-    )
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "HOST": config('DATABASE_HOST'),
+        "PORT": config('DATABASE_PORT'),
+        "NAME": config('DATABASE_NAME'),
+        "USER": config('DATABASE_USER'),
+        "PASSWORD": config('DATABASE_PASSWORD'),
+    }
 }
 
 # Cache
@@ -227,3 +239,13 @@ OBJECT_STORAGE_ACCESS_KEY = config('OBJECT_STORAGE_ACCESS_KEY')
 OBJECT_STORAGE_SECRET_KEY = config('OBJECT_STORAGE_SECRET_KEY')
 OBJECT_STORAGE_ENDPOINT_URL = config('OBJECT_STORAGE_ENDPOINT_URL')
 OBJECT_STORAGE_SECURE = False  # True when https
+
+# Celery
+CELERY_TIMEZONE = 'Asia/Tehran'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_URL = config('CELERY_BROKER_URL')
+CELERY_RESULT_BACKEND = config('CELERY_BROKER_URL')
