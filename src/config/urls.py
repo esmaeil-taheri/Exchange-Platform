@@ -22,5 +22,8 @@ urlpatterns = [
     path('api/v1/notifications/', include('apps.notifications.urls')),
 
     # Customers
-    path('api/v1/customers/', include('apps.customers.urls'))
+    path('api/v1/customers/', include('apps.customers.urls')),
+
+    # Exchange
+    path('api/v1/exchange/', include('apps.exchange.urls'))
 ]

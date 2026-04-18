@@ -43,7 +43,8 @@ INSTALLED_APPS = [
     "apps.site_setting.apps.SiteSettingConfig",
     "apps.customers.apps.CustomersConfig",
     "apps.admins.apps.SiteAdminsConfig",
-    "apps.notifications.apps.NotificationsConfig"
+    "apps.notifications.apps.NotificationsConfig",
+    "apps.exchange.apps.ExchangeConfig"
 ]
 
 MIDDLEWARE = [
@@ -222,6 +223,8 @@ SPECTACULAR_SETTINGS = {
         {"name": "Accounts", "description": "User-related endpoints"},
         {"name": "Notifications", "description": "Notification-related endpoints"},
         {"name": "Customers", "description": "Customer-related endpoints"},
+        {"name": "Exchange", "description": "Exchange-related endpoints"},
+        {"name": "schema", "description": "Schema-related endpoints"},
     ]
 }
 
