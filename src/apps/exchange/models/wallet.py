@@ -23,7 +23,7 @@ class Wallet(models.Model):
     desc = models.CharField(max_length=350, blank=True, verbose_name='Description')
 
     is_verified = models.BooleanField(default=False, verbose_name='Is Verified')
-    verified_at = models.DateTimeField(blank=True, null=True, verbose_name='Verified At')
+    verified_at = models.BigIntegerField(null=True, blank=True, verbose_name='Verified At')
 
     is_rejected = models.BooleanField(default=False, verbose_name='Is Rejected')
     reject_reson = models.CharField(max_length=350, blank=True, verbose_name='Rejected Reason')

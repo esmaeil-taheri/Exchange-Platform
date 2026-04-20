@@ -14,3 +14,19 @@ class BuySerializer(serializers.Serializer):
             amount=validated_data['amount'],
             buy_from_wallet=validated_data['buy_from_wallet']
         )
+
+
+class IRTTransactionListSerializer(serializers.Serializer):
+    amount = serializers.IntegerField()
+    wallet_type = serializers.CharField()
+    desc = serializers.CharField()
+    verified_at = serializers.IntegerField()
+    created_at = serializers.IntegerField()
+ 
+
+class XAU18TransactionListSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=12, decimal_places=4)
+    wallet_type = serializers.CharField()
+    desc = serializers.CharField()
+    verified_at = serializers.IntegerField()
+    created_at = serializers.IntegerField()

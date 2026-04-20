@@ -6,7 +6,18 @@ import time
 class PriceSelector:
 
     @staticmethod
-    def get_buy_sell_price(symbol='XAU18') -> dict:
+    def get_xau18_current_price(symbol='XAU18') -> dict:
+        price_log = CurrencyPriceLog.objects.select_related('currency').filter(
+            currency__symbol=symbol
+        ).order_by('-id').first()
+
+        return {
+            'price': price_log.price if price_log else 0,
+            'timestamp': int(price_log.timestamp)
+        }
+
+    @staticmethod
+    def get_xau18_buy_sell_price(symbol='XAU18') -> dict:
         price_logs = (
             CurrencyPriceLog.objects
             .select_related('currency')

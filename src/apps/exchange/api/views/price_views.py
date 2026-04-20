@@ -54,7 +54,7 @@ class GetBuySellPriceApiView(APIView):
     )
 
     def get(self, request, *args, **kwargs):
-        response = PriceSelector.get_buy_sell_price()
+        response = PriceSelector.get_xau18_buy_sell_price()
         serializer = PriceLogSerializer(response)
         return Response(
             serializer.data, 
