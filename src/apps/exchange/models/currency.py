@@ -43,8 +43,8 @@ class Currency(models.Model):
         verbose_name='Maintance Fee'
     )
 
-    is_sell = models.BooleanField(default=False, verbose_name='Buy Is Enabled')
-    is_buy = models.BooleanField(default=False, verbose_name='Sell Is Enabled')
+    is_sell = models.BooleanField(default=False, verbose_name='Sell Is Enabled')
+    is_buy = models.BooleanField(default=False, verbose_name='Buy Is Enabled')
 
     def __str__(self):
         return f'{self.en_title} : {self.symbol}'

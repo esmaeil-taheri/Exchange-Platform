@@ -17,12 +17,13 @@ from apps.notifications.exceptions.notification_exceptions import (
 )
 from apps.customers.exceptions.customer_exceptions import CustomerAlreadyUploadedDoc, CustomerAlreadyVerified
 from apps.customers.exceptions.bank_card_exceptions import BankCardNotFound, BankCardAlreadyExists
+from apps.exchange.exceptions.currency_exceptions import CurrencyNotBuyable
 
 
 def custom_exception_handler(exc, context):
 
     if isinstance(exc, ActionDisabled):
-        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+        return _error_response(exc, status.HTTP_403_FORBIDDEN)
 
     if isinstance(exc, OtpAlreadySent):
         return _error_response(exc, status.HTTP_429_TOO_MANY_REQUESTS)
@@ -31,7 +32,7 @@ def custom_exception_handler(exc, context):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
     
     if isinstance(exc, TwoFactorAlreadyEnabled):
-        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+        return _error_response(exc, status.HTTP_403_FORBIDDEN)
 
     if isinstance(exc, TwoFactorAlreadyDisabled):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
@@ -40,13 +41,13 @@ def custom_exception_handler(exc, context):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
     
     if isinstance(exc, NotificationAlreadyRead):
-        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+        return _error_response(exc, status.HTTP_403_FORBIDDEN)
     
     if isinstance(exc, CustomerAlreadyVerified):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
     
     if isinstance(exc, CustomerAlreadyUploadedDoc):
-        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+        return _error_response(exc, status.HTTP_403_FORBIDDEN)
     
     if isinstance(exc, BankCardAlreadyExists):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
@@ -56,6 +57,9 @@ def custom_exception_handler(exc, context):
     
     if isinstance(exc, NotificationNotFound):
         return _error_response(exc, status.HTTP_404_NOT_FOUND)
+    
+    if isinstance(exc, CurrencyNotBuyable):
+        return _error_response(exc, status.HTTP_403_FORBIDDEN)
 
     if isinstance(exc, FailedToSendOtp):
         return _error_response(exc, status.HTTP_503_SERVICE_UNAVAILABLE)
