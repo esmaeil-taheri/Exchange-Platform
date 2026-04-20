@@ -201,8 +201,8 @@ SIMPLE_JWT = {
 
 # Drf spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'My API',
-    'DESCRIPTION': 'Project API docs',
+    'TITLE': 'Im a NINJA too 🥷',
+    'DESCRIPTION': 'Gold Trading Paltfrom Docs',
     'VERSION': '1.0.0',
 
     'COMPONENT_SPLIT_REQUEST': True,

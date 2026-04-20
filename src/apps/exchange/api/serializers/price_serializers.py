@@ -15,3 +15,9 @@ class PriceLogSerializer(serializers.Serializer):
     lower_amounts = LowerAmountsSerializer()
     system_balance_amount = serializers.IntegerField()
     timestamp = serializers.IntegerField()
+
+
+class PriceQueryParamsSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(required=True, max_digits=12, decimal_places=4)
+    unit = serializers.ChoiceField(choices=['XAU18', 'IRT'], required=True)
+    transaction_type = serializers.ChoiceField(choices=["buy", "sell"], required=True)

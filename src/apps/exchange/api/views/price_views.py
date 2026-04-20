@@ -2,12 +2,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
-
+from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 from apps.exchange.selectors.price_selectors import PriceSelector
-from apps.exchange.api.serializers.price_serializers import PriceLogSerializer
+from apps.exchange.api.serializers.price_serializers import PriceLogSerializer, PriceQueryParamsSerializer
 from apps.core.exceptions.open_api import ErrorSerializer
+from apps.exchange.services.price_services import PriceService
 
 
 class GetBuySellPriceApiView(APIView):
@@ -60,3 +60,31 @@ class GetBuySellPriceApiView(APIView):
             serializer.data, 
             status=status.HTTP_200_OK
         )
+
+class PriceCalculatorApiView(APIView):
+
+    @extend_schema(
+        summary="Calculate currency Buy/Sell price",
+        tags=['Exchange'],
+        parameters=[
+            OpenApiParameter(name='unit', description='The unit of the currency', required=True, type=str),
+            OpenApiParameter(name='amount', description='The amount of the currency', required=True, type=float),
+            OpenApiParameter(name='transaction_type', description='The transaction type', required=True, enum=['buy', 'sell']),
+        ],
+        responses={200: PriceLogSerializer, 400: ErrorSerializer}
+    )
+    
+    def get(self, request, *args, **kwargs):
+        serializer = PriceQueryParamsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        data = PriceService.calculate_currency_price(
+            unit=serializer.validated_data['unit'],
+            amount=serializer.validated_data['amount'],
+            transaction_type=serializer.validated_data['transaction_type']
+        )
+        return Response(
+            data,
+            status=status.HTTP_200_OK
+        )
+    
