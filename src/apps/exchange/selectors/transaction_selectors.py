@@ -11,3 +11,7 @@ class TransactionSelector:
             currency__symbol=symbol,
             status=Transaction.TRANSACTIONSTATUSES[0][0],
         ).aggregate(locked_balance=Sum('amount'))['locked_balance'] or 0
+
+    @staticmethod
+    def get_transactions_list_by_user_id(user_id: str):
+        return Transaction.objects.filter(customer__user_id=user_id)

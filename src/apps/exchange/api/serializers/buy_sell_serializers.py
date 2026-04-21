@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.exchange.services.exchange_services import ExchangeService
+from apps.exchange.models.transaction import Transaction
 
 
 class BuySerializer(serializers.Serializer):
@@ -33,3 +34,28 @@ class XAU18TransactionListSerializer(serializers.Serializer):
     desc = serializers.CharField()
     verified_at = serializers.IntegerField()
     created_at = serializers.IntegerField()
+
+
+class InvoiceListSerializer(serializers.ModelSerializer):
+
+    currency_symbol = serializers.CharField(source='currency.symbol', read_only=True)
+    wallet_name = serializers.CharField(source='wallet.wallet_type', read_only=True)
+
+    class Meta:
+        model = Transaction
+        fields = [
+            'id',
+            'transaction_type',
+            'status',
+            'amount',
+            'fee_amount',
+            'fee_irt',
+            'unit_price_irt',
+            'total_price_irt',
+            'currency_symbol',
+            'wallet_name',
+            'gateway_buy',
+            'created_at',
+            'processed_at'
+        ]
+

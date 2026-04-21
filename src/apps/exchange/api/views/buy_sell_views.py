@@ -9,9 +9,10 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from apps.customers.api.permissions.customer_permisions import IsCustomerAuthenticated
 from apps.core.exceptions.open_api import ErrorSerializer
-from apps.exchange.api.serializers.buy_sell_serializers import BuySerializer, IRTTransactionListSerializer, XAU18TransactionListSerializer
+from apps.exchange.api.serializers.buy_sell_serializers import BuySerializer, IRTTransactionListSerializer, InvoiceListSerializer, XAU18TransactionListSerializer
 from apps.exchange.selectors.wallet_selectors import WalletSelector
 from apps.core.pagination import StandardResultsSetPagination
+from apps.exchange.selectors.transaction_selectors import TransactionSelector
 
 
 class GetBalanceApiView(APIView):
@@ -193,3 +194,36 @@ class GetTransactionListApiview(ListAPIView):
             )
 
         raise ValidationError({"detail": "wallet_type must be one of: IRT, XAU18"})
+
+
+@extend_schema(
+    summary="Get User Invoice List",
+    description="Returns paginated list of user's buy/sell invoices.",
+    tags=["Exchange"],
+    responses={
+        200: OpenApiResponse(
+            response=InvoiceListSerializer(many=True),
+            description="List of user invoices"
+        ),
+        400: OpenApiResponse(
+                response=ErrorSerializer,
+                description="Error response (400, 401, 403, 409, 500)",
+                examples=[
+                    OpenApiExample(
+                        name="RegistrationDisabled",
+                        value={"detail": "Inquiry is currently disabled."}
+                )
+            ]
+        )
+    }
+)
+class GetInvoiceListApiView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    serializer_class = InvoiceListSerializer
+
+    def get_queryset(self):
+        
+        return TransactionSelector.get_transactions_list_by_user_id(
+            user_id=self.request.user.id
+        )
