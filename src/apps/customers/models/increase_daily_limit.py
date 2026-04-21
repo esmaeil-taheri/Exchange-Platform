@@ -3,7 +3,7 @@ from django.db import models
 from apps.core.utils.date_time_utils import to_jalali
 
 
-class IncreaseDailyGoldLimit(models.Model):
+class IncreaseDailyTransactionLimit(models.Model):
 
     CELINGTYPE = [
         ('sell','Sell'),

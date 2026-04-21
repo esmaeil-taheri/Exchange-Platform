@@ -1,11 +1,15 @@
 from django.contrib import admin
 
-
 from apps.exchange.models.currency import Currency
 from apps.exchange.models.currency_balance import CurrencyBalance
 from apps.exchange.models.price_log import CurrencyPriceLog
 from apps.exchange.models.wallet import Wallet
 from apps.exchange.models.transaction import Transaction
+from apps.exchange.models.daily_transaction_limit import DailyTransactionLimit
+
+
+admin.site.register(DailyTransactionLimit)
+
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):

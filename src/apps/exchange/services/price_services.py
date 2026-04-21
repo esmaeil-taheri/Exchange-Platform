@@ -9,7 +9,7 @@ from apps.exchange.exceptions.price_exceptions import InsufficientBuyAmount, Ins
 class PriceService:
 
     @staticmethod
-    def calculate_currency_price(unit: str, amount: Union[int, float, Decimal], transaction_type: str) -> dict:
+    def calculate_xau18_currency_price(unit: str, amount: Union[int, float, Decimal], transaction_type: str) -> dict:
 
         price_log = CurrencyPriceLog.objects.select_related('currency').filter(
             currency__symbol='XAU18').order_by('-id').first()

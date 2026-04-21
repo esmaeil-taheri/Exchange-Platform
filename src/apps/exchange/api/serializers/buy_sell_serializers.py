@@ -9,7 +9,10 @@ class BuySerializer(serializers.Serializer):
     buy_from_wallet = serializers.BooleanField(default=False)
 
     def create(self, validated_data):
+        request = self.context['request']
+        user = request.user
         return ExchangeService.buy_asset(
+            user_id=user.id,
             asset=validated_data['aseet'],
             amount=validated_data['amount'],
             buy_from_wallet=validated_data['buy_from_wallet']

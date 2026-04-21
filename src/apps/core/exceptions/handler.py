@@ -19,6 +19,7 @@ from apps.customers.exceptions.customer_exceptions import CustomerAlreadyUploade
 from apps.customers.exceptions.bank_card_exceptions import BankCardNotFound, BankCardAlreadyExists
 from apps.exchange.exceptions.currency_exceptions import CurrencyNotBuyable
 from apps.exchange.exceptions.price_exceptions import InsufficientBuyAmount, InsufficientSellAmount
+from apps.exchange.exceptions.daily_limit_exceptions import DailyLimitExceeded
 
 
 def custom_exception_handler(exc, context):
@@ -66,6 +67,9 @@ def custom_exception_handler(exc, context):
         return _error_response(exc, status.HTTP_403_FORBIDDEN)
     
     if isinstance(exc, InsufficientSellAmount):
+        return _error_response(exc, status.HTTP_403_FORBIDDEN)
+    
+    if isinstance(exc, DailyLimitExceeded):
         return _error_response(exc, status.HTTP_403_FORBIDDEN)
 
     if isinstance(exc, FailedToSendOtp):

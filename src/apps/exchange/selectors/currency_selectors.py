@@ -1,5 +1,6 @@
 from apps.exchange.models.currency import Currency
-from src.apps.exchange.exceptions.currency_exceptions import CurrencyNotFound
+from apps.exchange.exceptions.currency_exceptions import CurrencyNotFound
+
 
 class CurrencySelector:
 

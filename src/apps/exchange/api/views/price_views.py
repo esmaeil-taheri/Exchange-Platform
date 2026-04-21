@@ -79,7 +79,7 @@ class PriceCalculatorApiView(APIView):
         serializer = PriceQueryParamsSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        data = PriceService.calculate_currency_price(
+        data = PriceService.calculate_xau18_currency_price(
             unit=serializer.validated_data['unit'],
             amount=serializer.validated_data['amount'],
             transaction_type=serializer.validated_data['transaction_type']

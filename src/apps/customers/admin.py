@@ -4,7 +4,7 @@ from apps.customers.models.customer import Customer
 from apps.customers.models.kyc import Kyc
 from apps.customers.models.kyc_document import KycDocument
 from apps.customers.models.bank_card import BankCard
-from apps.customers.models.daily_gold_limit import IncreaseDailyGoldLimit
+from apps.customers.models.increase_daily_limit import IncreaseDailyTransactionLimit
 
 
 class KycInlines(admin.StackedInline):
@@ -94,8 +94,8 @@ class BankCardAdmin(admin.ModelAdmin):
     read_only_fields = ['modified_by']
 
 
-@admin.register(IncreaseDailyGoldLimit)
-class IncreaseDailyGoldLimitAdmin(admin.ModelAdmin):
+@admin.register(IncreaseDailyTransactionLimit)
+class IncreaseDailyTransactionLimitAdmin(admin.ModelAdmin):
     list_display = [
         'amount', 'created_at_to_jalali'
     ]

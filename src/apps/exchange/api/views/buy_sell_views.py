@@ -126,7 +126,7 @@ class BuyApiView(APIView):
     )
 
     def post(self, request, *args, **kwargs):
-        serializer = BuySerializer(data=request.data)
+        serializer = BuySerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.save()
         return Response(
