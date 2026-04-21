@@ -4,7 +4,7 @@ from apps.exchange.services.exchange_services import ExchangeService
 
 
 class BuySerializer(serializers.Serializer):
-    amount = serializers.DecimalField(required=True, max_digits=12, decimal_places=4)
+    amount = serializers.DecimalField(required=True, max_digits=13, decimal_places=4)
     aseet = serializers.ChoiceField(choices=['XAU18'], required=True)
     buy_from_wallet = serializers.BooleanField(default=False)
 
