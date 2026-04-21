@@ -11,11 +11,10 @@ class ExchangeService:
     def buy_asset(asset: str, amount: int, buy_from_wallet: bool) -> dict:
 
         site_settings = get_site_settings()
+        if not site_settings.is_buy:
+            raise CurrencyNotBuyable("در حال حاضر امکان خرید وجود ندارد")
 
         currency = CurrencySelector.get_currency_by_symbol(symbol=asset)
-
-        print(currency, currency.is_buy)
-
         if not currency.is_buy:
             raise CurrencyNotBuyable("در حال حاضر امکان خرید وجود ندارد")
         

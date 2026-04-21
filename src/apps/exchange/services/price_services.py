@@ -3,6 +3,8 @@ from apps.exchange.models.price_log import CurrencyPriceLog
 
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 
+from apps.exchange.exceptions.price_exceptions import InsufficientBuyAmount, InsufficientSellAmount
+
 
 class PriceService:
 
@@ -30,6 +32,10 @@ class PriceService:
         gold_amount = gold_amount.quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
 
         if transaction_type == 'buy' and unit == 'IRT':
+
+            # چک حداقل خرید
+            if gold_amount < lowest_buy:
+                raise InsufficientBuyAmount(f"مقدار درخواستی کمتر از حداقل مقدار قابل خرید است")
 
             while gold_amount > 0:
 
@@ -86,10 +92,6 @@ class PriceService:
                 gold_amount -= Decimal("0.0001")
                 gold_amount = gold_amount.quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
 
-            # چک حداقل خرید
-            if gold_amount < lowest_buy:
-                raise ValueError(f"Minimum buy amount is {lowest_buy} grams")
-
             net_amount = gold_price_toman
 
             response = {
@@ -112,7 +114,7 @@ class PriceService:
 
             # چک حداقل فروش
             if gold_amount < lowest_sell:
-                raise ValueError(f"Minimum sell amount is {lowest_sell} grams")
+                raise InsufficientSellAmount('مقدار درخواستی کمتر از حداقل مقدار قابل فروش است')
 
             # ------------------------------
             #   محاسبه کارمزد فروش

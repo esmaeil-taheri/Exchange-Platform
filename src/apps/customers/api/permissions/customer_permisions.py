@@ -1,6 +1,7 @@
 from rest_framework.permissions import BasePermission
 from apps.customers.models.customer import Customer
 
+
 class CanUploadKycDocument(BasePermission):
     message = "برای آپلود کارت ملی باید ابتدا مرحله اول احراز هویت را انجام دهید."
 
@@ -32,6 +33,10 @@ class IsCustomerAuthenticated(BasePermission):
 
         customer = getattr(user, "customer_profile", None)
         if customer is None:
+            return False
+        
+        if customer.status == Customer.CUSTOMERSTATUS[1][0]:  # suspended
+            self.message = "حساب کاربری شما مسدود شده است."
             return False
 
         return customer.status == Customer.CUSTOMERSTATUS[2][0]

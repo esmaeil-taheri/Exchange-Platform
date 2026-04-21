@@ -31,6 +31,10 @@ class SiteSetting(SingletonModel):
     # Sms
     send_welcome_sms = models.BooleanField(default=False, verbose_name='Send Welome Message')
     send_login_alert_sms = models.BooleanField(default=False, verbose_name='Send Login Alret SMS')
+
+    # buy/sell
+    is_sell = models.BooleanField(default=False, verbose_name='Sell Is Enabled')
+    is_buy = models.BooleanField(default=False, verbose_name='Buy Is Enabled')
     
     # System Metadata
     modified_timestamp = models.IntegerField(default=0, verbose_name='Modified Timestamp')
