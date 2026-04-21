@@ -61,6 +61,7 @@ class GetBuySellPriceApiView(APIView):
             status=status.HTTP_200_OK
         )
 
+
 class PriceCalculatorApiView(APIView):
 
     @extend_schema(
@@ -83,6 +84,25 @@ class PriceCalculatorApiView(APIView):
             amount=serializer.validated_data['amount'],
             transaction_type=serializer.validated_data['transaction_type']
         )
+        return Response(
+            data,
+            status=status.HTTP_200_OK
+        )
+
+
+class GetPriceChartApiView(APIView):
+
+    @extend_schema(
+        summary="Get price chart",
+        tags=['Exchange'],
+        parameters=[
+            OpenApiParameter(name='chart_type', description='The chart type', required=True, enum=[7, 24, 30]),
+        ],
+        responses={200: PriceLogSerializer, 400: ErrorSerializer}
+    )
+    
+    def get(self, request, *args, **kwargs):
+        data = PriceSelector.get_xau18_quarter_hourly_chart_data()
         return Response(
             data,
             status=status.HTTP_200_OK
