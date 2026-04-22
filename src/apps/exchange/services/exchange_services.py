@@ -9,6 +9,11 @@ from apps.exchange.services.daily_limit_services import DailyLimitService
 from apps.exchange.services.currency_balance_service import CurrencyBalanceSerivce
 from apps.exchange.selectors.currency_selectors import CurrencySelector
 from apps.exchange.selectors.wallet_selectors import WalletSelector
+from apps.core.exceptions.base import ActionDisabled
+from apps.core.utils.date_time_utils import get_date_time
+from apps.core.utils.security_utils import get_client_ip
+from apps.exchange.services.transaction_service import TransactionService
+from apps.exchange.services.wallet_service import WalletService
 
 from .price_services import PriceService
 
@@ -16,7 +21,7 @@ from .price_services import PriceService
 class ExchangeService:
 
     @staticmethod
-    def buy_asset(user_id: int, asset: str, amount: int, buy_from_wallet: bool) -> dict:
+    def buy_asset(request, asset: str, amount: int, buy_from_wallet: bool) -> dict:
 
         site_settings = get_site_settings()
         if not site_settings.is_buy:
@@ -38,15 +43,47 @@ class ExchangeService:
         if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(available_balance)):
             raise InsufficientSystemBalance('میزان درخواستی بیشتر از موجودی فعلی است')
 
-        customer = Customer.objects.get(user_id=user_id)
+        customer = Customer.objects.get(user_id=request.user.id)
 
         DailyLimitService.check_daily_limit(customer, amount, 'buy')
 
         if buy_from_wallet:
 
-            irt_amount = WalletSelector.get_user_balance(user_id=user_id)['irt']['balance']
-            if amount > irt_amount:
-                raise InsufficientUserBalance('مبلغ فاکتور شما بیشتر از موجودی کیف پول است')
+            if not currency.buy_from_wallet:
+                raise ActionDisabled('در حال حاضر امکان خرید از کیف پول وجود ندارد')
 
-            with transaction.atomic:
-                pass
+            wallets = WalletSelector.get_user_balance(user_id=request.user.id)
+
+            irt_amount = next(
+                (w['balance'] for w in wallets if w['wallet_type'] == 'IRT'),
+                Decimal('0')
+            )
+            if amount > irt_amount:
+                raise InsufficientUserBalance('موجودی کیف پول ناکافی است')
+            
+            customer_ip = get_client_ip(request)
+            timestamp = get_date_time()['timestamp']
+
+            with transaction.atomic():
+
+                wallet_entry = WalletService.create_wallet_entry(
+                    customer=customer,
+                    currency=currency,
+                    amount=calculated_price['data']['total_amount'] * -1,
+                    desc=f'بابت خرید {currency.fa_title}',
+                    ip=customer_ip,
+                    timestamp=timestamp
+                )
+
+                TransactionService.create_buy_transaction(
+                    customer=customer,
+                    currency=currency,
+                    wallet=wallet_entry,
+                    calculated_price=calculated_price,
+                    ip=customer_ip,
+                    timestamp=timestamp
+                )
+            return {'message': 'خرید با موفقیت انجام شد'}
+        
+        else:
+            pass

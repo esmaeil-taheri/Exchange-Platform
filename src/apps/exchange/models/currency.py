@@ -46,5 +46,8 @@ class Currency(models.Model):
     is_sell = models.BooleanField(default=False, verbose_name='Sell Is Enabled')
     is_buy = models.BooleanField(default=False, verbose_name='Buy Is Enabled')
 
+    buy_from_wallet = models.BooleanField(default=False, verbose_name='Buy From Wallet')
+    buy_from_gateway = models.BooleanField(default=False, verbose_name='Buy From Gateway')
+
     def __str__(self):
         return f'{self.en_title} : {self.symbol}'

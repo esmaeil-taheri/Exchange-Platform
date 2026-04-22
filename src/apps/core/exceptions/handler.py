@@ -20,7 +20,7 @@ from apps.customers.exceptions.bank_card_exceptions import BankCardNotFound, Ban
 from apps.exchange.exceptions.currency_exceptions import CurrencyNotBuyable
 from apps.exchange.exceptions.price_exceptions import InsufficientBuyAmount, InsufficientSellAmount
 from apps.exchange.exceptions.daily_limit_exceptions import DailyLimitExceeded
-from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance
+from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance, InsufficientUserBalance
 
 
 def custom_exception_handler(exc, context):
@@ -75,6 +75,9 @@ def custom_exception_handler(exc, context):
     
     if isinstance(exc, InsufficientSystemBalance):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
+    if isinstance(exc, InsufficientUserBalance):
+        return _error_response(exc, status.HTTP_403_FORBIDDEN)
 
     if isinstance(exc, FailedToSendOtp):
         return _error_response(exc, status.HTTP_503_SERVICE_UNAVAILABLE)
