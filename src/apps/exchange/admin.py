@@ -13,12 +13,23 @@ admin.site.register(DailyTransactionLimit)
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = [ 'currency', 'customer', 'ip', 'amount', 'transaction_type', 'status', 'gateway_buy', 'shamsi_created']
+    list_display = [ 'currency', 'customer', 'amount', 'formatted_total_price_irt', 'ip',  'transaction_type', 'status', 'gateway_buy', 'shamsi_created']
+
+
+    def formatted_total_price_irt(self, obj):
+        if obj.total_price_irt is None:
+            return "-"
+        return f"{obj.total_price_irt:,}"
 
 
 @admin.register(Wallet)
 class WalletAdmin(admin.ModelAdmin):
-    list_display = ['customer', 'ip', 'amount', 'wallet_type', 'is_verified', 'is_rejected']
+    list_display = ['customer', 'ip', 'formatted_amount', 'wallet_type', 'is_verified', 'is_rejected']
+
+    def formatted_amount(self, obj):
+        if obj.wallet_type == 'irt':
+            return f"{int(obj.amount):,}"
+        return obj.amount
 
 
 @admin.register(CurrencyBalance)

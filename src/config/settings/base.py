@@ -28,6 +28,7 @@ SECRET_KEY = config("SECRET_KEY")
 # Application definition
 
 INSTALLED_APPS = [
+    # 'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -252,3 +253,94 @@ CELERY_TASK_IGNORE_RESULT = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BROKER_URL = config('CELERY_BROKER_URL')
 CELERY_RESULT_BACKEND = config('CELERY_BROKER_URL')
+
+
+# Jazzmin
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-success",
+    "accent": "accent-lime",
+    "navbar": "navbar-dark",
+    "no_navbar_border": False,
+    "navbar_fixed": False,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": False,
+    "sidebar": "sidebar-dark-success",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": False,
+    "sidebar_nav_compact_style": False,
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": False,
+    "theme": "darkly",  # بهترین دارک بالانس شده
+    "dark_mode_theme": "cyborg",
+    "default_theme_mode": "dark",
+
+    # ---------- Buttons ----------
+    "button_classes": {
+        "primary": "btn-outline-cyan",
+        "secondary": "btn-outline-light",
+        "info": "btn-outline-info",
+        "warning": "btn-outline-warning",
+        "danger": "btn-outline-danger",
+        "success": "btn-outline-success",
+    },
+}
+
+JAZZMIN_SETTINGS = {
+    "site_title": "Admin Panel",
+    "site_header": "Finance Dashboard",
+    "site_brand": "⚡ Core Admin",
+    "welcome_sign": "Welcome to Control Center",
+
+    "icons": {
+
+        # Dashboard
+        "auth": "fas fa-gauge-high",
+
+        # Accounts
+        "accounts.CustomUser": "fas fa-user",
+
+        # Admins
+        "admins.SiteAdmin": "fas fa-user-shield",
+        "admins.TrustedIp": "fas fa-shield-halved",
+
+        # Authentication
+        "auth.Group": "fas fa-users",
+
+        # Customers
+        "customers.Customer": "fas fa-user-tag",
+        "customers.BankCard": "fas fa-credit-card",
+        "customers.KYC": "fas fa-id-card",
+        "customers.IncreaseDailyTransactionLimit": "fas fa-arrow-up-right-dots",
+
+        # Exchange
+        "exchange.Currency": "fas fa-coins",
+        "exchange.CurrencyBalance": "fas fa-wallet",
+        "exchange.CurrencyPriceLog": "fas fa-chart-line",
+        "exchange.DailyTransactionLimit": "fas fa-limit",
+        "exchange.Transaction": "fas fa-arrow-right-arrow-left",
+        "exchange.Wallet": "fas fa-wallet",
+
+        # Notifications
+        "notifications.NotificationTemplate": "fas fa-envelope-open-text",
+        "notifications.Notification": "fas fa-bell",
+        "notifications.UserNotificationStatus": "fas fa-bell-circle-check",
+
+        # Celery Beat
+        "django_celery_beat.ClockedSchedule": "fas fa-clock",
+        "django_celery_beat.CrontabSchedule": "fas fa-calendar-days",
+        "django_celery_beat.IntervalSchedule": "fas fa-hourglass-half",
+        "django_celery_beat.PeriodicTask": "fas fa-rotate",
+        "django_celery_beat.SolarSchedule": "fas fa-sun",
+
+        # Site Setting
+        "site_setting.SiteSetting": "fas fa-gears",
+    }
+
+}
