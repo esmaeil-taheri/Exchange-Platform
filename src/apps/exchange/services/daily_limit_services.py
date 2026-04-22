@@ -16,25 +16,17 @@ class DailyLimitService:
         else:
             base_limit = base_limit_obj.sell_amount
 
-        print(base_limit)
-
         additional_limit = DailyLimitSelector.get_approved_limit_increases(
             customer,
             transaction_type
         )
-
-        print(additional_limit)
 
         today_usage = DailyLimitSelector.get_customer_daily_usage(
             customer,
             transaction_type
         )
 
-        print(today_usage)
-
         final_limit = base_limit + additional_limit
-
-        print(final_limit)
 
         if today_usage + amount > final_limit:
             raise DailyLimitExceeded(

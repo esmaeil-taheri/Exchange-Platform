@@ -68,7 +68,7 @@ class ExchangeService:
 
                 wallet_entry = WalletService.create_wallet_entry(
                     customer=customer,
-                    currency=currency,
+                    wallet_type='irt',
                     amount=calculated_price['data']['total_amount'] * -1,
                     desc=f'بابت خرید {currency.fa_title}',
                     ip=customer_ip,
@@ -85,5 +85,67 @@ class ExchangeService:
                 )
             return {'message': 'خرید با موفقیت انجام شد'}
         
+        else:
+            pass
+    
+    @staticmethod
+    def sell_asset(request, asset: str, amount: Decimal, card_withdaraw: bool, bank_card_id: int = None) -> dict:
+
+        site_settings = get_site_settings()
+        if not site_settings.is_sell:
+            raise CurrencyNotBuyable("در حال حاضر امکان فروش وجود ندارد")
+        
+
+        currency = CurrencySelector.get_currency_by_symbol(symbol=asset)
+        if not currency.is_sell:
+            raise CurrencyNotBuyable("در حال حاضر امکان فروش وجود ندارد")
+        
+        calculated_price = PriceService.calculate_xau18_currency_price(
+            unit='XAU18',
+            amount=amount,
+            transaction_type='sell'
+        )
+
+        customer = Customer.objects.get(user_id=request.user.id)
+
+        DailyLimitService.check_daily_limit(customer, calculated_price['data']['total_amount'], 'sell')
+
+
+        if not card_withdaraw:
+            
+            wallets = WalletSelector.get_user_balance(user_id=request.user.id)
+
+            xau18_amount = next(
+                (w['balance'] for w in wallets if w['wallet_type'] == 'XAU18'),
+                Decimal('0')
+            )
+
+            if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(xau18_amount)):
+                raise InsufficientUserBalance('موجودی صندوق طلا ناکافی است')
+            
+            customer_ip = get_client_ip(request)
+            timestamp = get_date_time()['timestamp']
+
+            with transaction.atomic():
+
+                wallet_entry = WalletService.create_wallet_entry(
+                    customer=customer,
+                    wallet_type='xau',
+                    amount=Decimal(calculated_price['data']['gold_amount']) * -1,
+                    desc=f'بابت فروش {currency.fa_title}',
+                    ip=customer_ip,
+                    timestamp=timestamp
+                )
+
+                TransactionService.create_sell_transaction(
+                    customer=customer,
+                    currency=currency,
+                    wallet=wallet_entry,
+                    calculated_price=calculated_price,
+                    ip=customer_ip,
+                    timestamp=timestamp
+                )
+            return {'message': 'فروش با موفقیت انجام شد'}
+    
         else:
             pass

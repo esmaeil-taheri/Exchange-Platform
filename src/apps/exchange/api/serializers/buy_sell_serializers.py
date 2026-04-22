@@ -57,3 +57,22 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             'processed_at'
         ]
 
+class SellSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(required=True, max_digits=13, decimal_places=4)
+    aseet = serializers.ChoiceField(choices=['XAU18'], required=True)
+    card_withdaraw = serializers.BooleanField(default=False)
+    bank_card_id = serializers.IntegerField(required=False)
+
+    def create(self, validated_data):
+        return ExchangeService.sell_asset(
+            request=self.context['request'],
+            asset=validated_data['aseet'],
+            amount=validated_data['amount'],
+            card_withdaraw=validated_data['card_withdaraw'],
+            bank_card_id=validated_data.get('bank_card_id')
+        )
+    
+    def validate(self, attrs):
+        if attrs.get('card_withdaraw') and not attrs.get('bank_card_id'):
+            raise serializers.ValidationError("bank_card_id is required when card_withdaraw is True.")
+        return attrs
