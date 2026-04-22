@@ -3,6 +3,7 @@ import requests
 
 from apps.exchange.models.price_log import CurrencyPriceLog
 from apps.exchange.models.currency import Currency
+from apps.exchange.models.transaction import Transaction
 from apps.core.utils.date_time_utils import get_date_time
 
 
@@ -25,3 +26,11 @@ def fetch_gold_price(self):
 
     except:
         return 'Cannot fetch gold price'
+
+
+@shared_task(bind=True, max_retries=5)
+def process_transaction(self, transaction_id):
+
+    transaction = Transaction.objects.get(id=transaction_id)
+
+    return f'Transaction Done: {transaction.id}'
