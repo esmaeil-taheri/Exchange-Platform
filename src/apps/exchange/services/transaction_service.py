@@ -1,3 +1,4 @@
+from decimal import Decimal
 from apps.exchange.models.transaction import Transaction
 
 
@@ -11,10 +12,10 @@ class TransactionService:
             currency=currency,
             wallet=wallet,
             amount=calculated_price['data']['gold_amount'],
-            fee_amount=round(
-                calculated_price['data']['fee_toman'] /
-                calculated_price['data']['price_per_gram'], 4
-            ),
+            fee_amount = (
+                Decimal(calculated_price['data']['fee_toman']) /
+                Decimal(calculated_price['data']['price_per_gram'])
+            ).quantize(Decimal('0.0001')),
             fee_irt=calculated_price['data']['fee_toman'],
             unit_price_irt=calculated_price['data']['price_per_gram'],
             total_price_irt=calculated_price['data']['total_amount'],
@@ -32,10 +33,10 @@ class TransactionService:
             currency=currency,
             wallet=wallet,
             amount=calculated_price['data']['gold_amount'],
-            fee_amount=round(
-                calculated_price['data']['fee_toman'] /
-                calculated_price['data']['price_per_gram'], 4
-            ),
+            fee_amount = (
+                Decimal(calculated_price['data']['fee_toman']) /
+                Decimal(calculated_price['data']['price_per_gram'])
+            ).quantize(Decimal('0.0001')),
             fee_irt=calculated_price['data']['fee_toman'],
             unit_price_irt=calculated_price['data']['price_per_gram'],
             total_price_irt=calculated_price['data']['total_amount'],

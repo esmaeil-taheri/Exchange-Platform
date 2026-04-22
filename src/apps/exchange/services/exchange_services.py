@@ -51,20 +51,18 @@ class ExchangeService:
 
             if not currency.buy_from_wallet:
                 raise ActionDisabled('در حال حاضر امکان خرید از کیف پول وجود ندارد')
-
-            wallets = WalletSelector.get_user_balance(user_id=request.user.id)
-
-            irt_amount = next(
-                (w['balance'] for w in wallets if w['wallet_type'] == 'IRT'),
-                Decimal('0')
-            )
-            if amount > irt_amount:
-                raise InsufficientUserBalance('موجودی کیف پول ناکافی است')
             
             customer_ip = get_client_ip(request)
             timestamp = get_date_time()['timestamp']
 
             with transaction.atomic():
+
+                user_wallet_balance = WalletSelector.get_user_balance_for_update(
+                    user_id=request.user.id, wallet_type='irt'
+                )
+
+                if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(user_wallet_balance)):
+                    raise InsufficientUserBalance('موجودی کیف پول ناکافی است')
 
                 wallet_entry = WalletService.create_wallet_entry(
                     customer=customer,
@@ -95,7 +93,6 @@ class ExchangeService:
         if not site_settings.is_sell:
             raise CurrencyNotBuyable("در حال حاضر امکان فروش وجود ندارد")
         
-
         currency = CurrencySelector.get_currency_by_symbol(symbol=asset)
         if not currency.is_sell:
             raise CurrencyNotBuyable("در حال حاضر امکان فروش وجود ندارد")
@@ -110,23 +107,19 @@ class ExchangeService:
 
         DailyLimitService.check_daily_limit(customer, calculated_price['data']['total_amount'], 'sell')
 
-
         if not card_withdaraw:
-            
-            wallets = WalletSelector.get_user_balance(user_id=request.user.id)
-
-            xau18_amount = next(
-                (w['balance'] for w in wallets if w['wallet_type'] == 'XAU18'),
-                Decimal('0')
-            )
-
-            if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(xau18_amount)):
-                raise InsufficientUserBalance('موجودی صندوق طلا ناکافی است')
             
             customer_ip = get_client_ip(request)
             timestamp = get_date_time()['timestamp']
 
             with transaction.atomic():
+
+                user_wallet_balance = WalletSelector.get_user_balance_for_update(
+                    user_id=request.user.id, wallet_type='xau'
+                )
+
+                if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(user_wallet_balance)):
+                    raise InsufficientUserBalance('موجودی صندوق طلا ناکافی است')
 
                 wallet_entry = WalletService.create_wallet_entry(
                     customer=customer,

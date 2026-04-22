@@ -56,4 +56,19 @@ class WalletSelector:
             ).only(
             'id', 'amount',  'wallet_type', 'desc', 'verified_at', 'created_at'
         )
-        
+    
+    @staticmethod
+    def get_user_balance_for_update(user_id: int, wallet_type: str):
+
+        wallets = (
+            Wallet.objects
+            .select_for_update()
+            .filter(
+                customer__user_id=user_id,
+                wallet_type=wallet_type,
+                is_verified=True
+            )
+        )
+
+        balance = wallets.aggregate(total=Sum('amount'))['total'] or 0
+        return balance
