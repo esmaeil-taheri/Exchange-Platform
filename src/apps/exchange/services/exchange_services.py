@@ -38,12 +38,6 @@ class ExchangeService:
             transaction_type='buy'
         )
 
-        available_balance = CurrencyBalanceSerivce.calculate_available_balance(symbol=asset)
-
-        print(calculated_price['data']['gold_amount'], available_balance)
-        if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(available_balance)):
-            raise InsufficientSystemBalance('میزان درخواستی بیشتر از موجودی فعلی است')
-
         customer = Customer.objects.get(user_id=request.user.id)
 
         DailyLimitService.check_daily_limit(customer, amount, 'buy')
@@ -58,11 +52,15 @@ class ExchangeService:
 
             with transaction.atomic():
 
+                available_balance = CurrencyBalanceSerivce.calculate_available_balance_for_update(symbol=asset)
+                if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(available_balance)):
+                    raise InsufficientSystemBalance('میزان درخواستی بیشتر از موجودی فعلی است')
+
                 user_wallet_balance = WalletSelector.get_user_balance_for_update(
                     user_id=request.user.id, wallet_type='irt'
                 )
 
-                if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(user_wallet_balance)):
+                if int(calculated_price['data']['total_amount']) > int(user_wallet_balance):
                     raise InsufficientUserBalance('موجودی کیف پول ناکافی است')
 
                 wallet_entry = WalletService.create_wallet_entry(
@@ -83,7 +81,9 @@ class ExchangeService:
                     timestamp=timestamp
                 )
 
-                process_transaction.delay(transaction_id=transaction_entry.id)
+                transaction.on_commit(
+                    lambda: process_transaction.delay(transaction_id=transaction_entry.id)
+                )
 
             return {'message': 'خرید با موفقیت انجام شد'}
         
@@ -143,7 +143,9 @@ class ExchangeService:
                     timestamp=timestamp
                 )
 
-                process_transaction.delay(transaction_id=transaction_entry.id)
+                transaction.on_commit(
+                    lambda: process_transaction.delay(transaction_id=transaction_entry.id)
+                )
 
             return {'message': 'فروش با موفقیت انجام شد'}
     

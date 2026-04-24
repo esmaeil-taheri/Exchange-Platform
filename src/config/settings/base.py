@@ -323,14 +323,14 @@ JAZZMIN_SETTINGS = {
         "exchange.Currency": "fas fa-coins",
         "exchange.CurrencyBalance": "fas fa-wallet",
         "exchange.CurrencyPriceLog": "fas fa-chart-line",
-        "exchange.DailyTransactionLimit": "fas fa-limit",
+        "exchange.DailyTransactionLimit": "fas fa-tachometer-alt",
         "exchange.Transaction": "fas fa-arrow-right-arrow-left",
         "exchange.Wallet": "fas fa-wallet",
 
         # Notifications
         "notifications.NotificationTemplate": "fas fa-envelope-open-text",
         "notifications.Notification": "fas fa-bell",
-        "notifications.UserNotificationStatus": "fas fa-bell-circle-check",
+        "notifications.UserNotificationStatus": "fas fa-user-check",
 
         # Celery Beat
         "django_celery_beat.ClockedSchedule": "fas fa-clock",
