@@ -138,6 +138,33 @@ services:
     networks:
       - django_network
 
+  prometheus:
+      image: prom/prometheus
+      container_name: prometheus
+      volumes:
+        - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      ports:
+        - "9090:9090"
+      depends_on:
+        - backend
+      networks:
+        - django_network
+
+  grafana:
+      image: grafana/grafana
+      container_name: grafana
+      ports:
+        - "3000:3000"
+      volumes:
+        - grafana-storage:/var/lib/grafana
+      environment:
+        - GF_INSTALL_PLUGINS=
+        - GF_PLUGINS_PREINSTALL=
+      depends_on:
+        - prometheus
+      networks:
+        - django_network
+
   nginx:
     image: nginx:mainline-alpine3.23
     container_name: django_nginx
@@ -154,6 +181,7 @@ services:
 
 volumes:
   django_postgres_data:
+  grafana-storage:
 
 networks:
   django_network:
