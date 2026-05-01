@@ -14,7 +14,6 @@ from apps.core.utils.date_time_utils import get_date_time
 from apps.core.utils.security_utils import get_client_ip
 from apps.exchange.services.transaction_service import TransactionService
 from apps.exchange.services.wallet_service import WalletService
-from apps.exchange.tasks.exchange_tasks import process_transaction
 
 from .price_services import PriceService
 
@@ -72,17 +71,13 @@ class ExchangeService:
                     timestamp=timestamp
                 )
 
-                transaction_entry = TransactionService.create_buy_transaction(
+                TransactionService.create_buy_transaction(
                     customer=customer,
                     currency=currency,
                     wallet=wallet_entry,
                     calculated_price=calculated_price,
                     ip=customer_ip,
                     timestamp=timestamp
-                )
-
-                transaction.on_commit(
-                    lambda: process_transaction.delay(transaction_id=transaction_entry.id)
                 )
 
             return {'message': 'خرید با موفقیت انجام شد'}
@@ -134,17 +129,13 @@ class ExchangeService:
                     timestamp=timestamp
                 )
 
-                transaction_entry = TransactionService.create_sell_transaction(
+                TransactionService.create_sell_transaction(
                     customer=customer,
                     currency=currency,
                     wallet=wallet_entry,
                     calculated_price=calculated_price,
                     ip=customer_ip,
                     timestamp=timestamp
-                )
-
-                transaction.on_commit(
-                    lambda: process_transaction.delay(transaction_id=transaction_entry.id)
                 )
 
             return {'message': 'فروش با موفقیت انجام شد'}

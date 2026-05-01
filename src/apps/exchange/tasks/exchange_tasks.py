@@ -1,10 +1,11 @@
 from celery import shared_task
-import requests
 
 from apps.exchange.models.price_log import CurrencyPriceLog
 from apps.exchange.models.currency import Currency
 from apps.exchange.models.transaction import Transaction
 from apps.core.utils.date_time_utils import get_date_time
+
+import requests
 
 
 @shared_task(bind=True)
@@ -28,9 +29,41 @@ def fetch_gold_price(self):
         return 'Cannot fetch gold price'
 
 
-@shared_task(bind=True, max_retries=5)
-def process_transaction(self, transaction_id):
+@shared_task()
+def process_buy_transactions():
 
-    transaction = Transaction.objects.get(id=transaction_id)
+    now_ts = get_date_time()['timestamp']
 
-    return f'Transaction Done: {transaction.id}'
+    pending = Transaction.objects.filter(
+        status='pending',
+        transaction_type='sell',
+        is_checked=False,
+        created_at__lt=now_ts
+    ).order_by('created_at')[:3]
+
+    txn_list = []
+
+    for txn in pending:
+        txn_list.append(txn.id)
+
+    return txn_list
+
+
+@shared_task()
+def process_sell_transactions():
+
+    now_ts = get_date_time()['timestamp']
+
+    pending = Transaction.objects.filter(
+        status='pending',
+        transaction_type='sell',
+        is_checked=False,
+        created_at__lt=now_ts
+    ).order_by('created_at')[:3]
+
+    txn_list = []
+
+    for txn in pending:
+        txn_list.append(txn.id)
+
+    return txn_list
