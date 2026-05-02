@@ -14,6 +14,16 @@ class Transaction(models.Model):
         ('success', 'Success'),
         ('rejected', 'Rejected')
     )
+
+    WITHDRAWTYPES= (
+        ('wallet', 'Wallet'),
+        ('bank', 'Bank')
+    )
+
+    DEPOSITTYPES = (
+        ('wallet', 'Wallet'),
+        ('gate', 'Gateway')
+    )
     
     customer = models.ForeignKey(
         'customers.Customer', on_delete=models.CASCADE,
@@ -57,7 +67,20 @@ class Transaction(models.Model):
         default=TRANSACTIONSTATUSES[0][0], verbose_name='Status'
     )
 
-    gateway_buy = models.BooleanField(default=False, verbose_name='Gateway Buy')
+    deposit_method = models.CharField(
+        max_length=10, choices=DEPOSITTYPES, 
+        default=DEPOSITTYPES[0][0], verbose_name='Deposit Method'
+    )
+
+
+    withdraw_method = models.CharField(
+        max_length=10, choices=WITHDRAWTYPES, 
+        default=WITHDRAWTYPES[0][0], verbose_name='Withdraw Method'
+    )
+
+    is_checked = models.BooleanField(default=False, verbose_name='Checked')
+
+    reject_reason = models.CharField(max_length=255, default='', verbose_name='Reject Reason')
 
     created_at = models.BigIntegerField(default=0, verbose_name='Created At')
     processed_at = models.BigIntegerField(default=0, verbose_name='Processed At')

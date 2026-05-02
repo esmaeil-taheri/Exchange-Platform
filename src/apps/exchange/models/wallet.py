@@ -1,6 +1,9 @@
 from django.db import models
 
 
+import jdatetime
+
+
 class Wallet(models.Model):
 
     WALLETTYPES = [
@@ -49,3 +52,11 @@ class Wallet(models.Model):
 
     def __str__(self):
         return f"{self.wallet_type.upper()} {round(self.amount, 4)}"
+
+
+    @property
+    def shamsi_created(self):
+        if self.created_at:
+            return jdatetime.datetime.fromtimestamp(self.created_at).strftime("%Y/%m/%d %H:%M:%S")
+        return "-"
+    

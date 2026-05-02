@@ -13,7 +13,14 @@ admin.site.register(DailyTransactionLimit)
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = [ 'currency', 'customer', 'amount', 'formatted_total_price_irt', 'ip',  'transaction_type', 'status', 'gateway_buy', 'shamsi_created']
+    list_display = [
+        'currency', 'customer', 'amount', 
+        'formatted_total_price_irt',  
+        'transaction_type', 'deposit_method',
+        'withdraw_method', 'is_checked', 
+        'status', 'ip', 'shamsi_created', 
+        'shamsi_processed'
+    ]
 
 
     def formatted_total_price_irt(self, obj):
@@ -24,7 +31,7 @@ class TransactionAdmin(admin.ModelAdmin):
 
 @admin.register(Wallet)
 class WalletAdmin(admin.ModelAdmin):
-    list_display = ['customer', 'ip', 'formatted_amount', 'wallet_type', 'is_verified', 'is_rejected']
+    list_display = ['customer', 'ip', 'formatted_amount', 'wallet_type', 'is_verified', 'is_rejected', 'shamsi_created']
 
     def formatted_amount(self, obj):
         if obj.wallet_type == 'irt':

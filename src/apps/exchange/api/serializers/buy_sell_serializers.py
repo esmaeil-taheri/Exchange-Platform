@@ -52,7 +52,6 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             'total_price_irt',
             'currency_symbol',
             'wallet_name',
-            'gateway_buy',
             'created_at',
             'processed_at'
         ]
