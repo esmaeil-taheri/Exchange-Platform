@@ -46,7 +46,8 @@ INSTALLED_APPS = [
     "apps.customers.apps.CustomersConfig",
     "apps.admins.apps.SiteAdminsConfig",
     "apps.notifications.apps.NotificationsConfig",
-    "apps.exchange.apps.ExchangeConfig"
+    "apps.exchange.apps.ExchangeConfig",
+    "apps.payments.apps.PaymentsConfig"
 ]
 
 MIDDLEWARE = [
