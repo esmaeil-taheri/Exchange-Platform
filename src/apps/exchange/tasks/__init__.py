@@ -1,2 +1,2 @@
-from .exchange_tasks import fetch_gold_price
+from .price_tasks import fetch_gold_price
 from .exchange_tasks import process_buy_transactions, process_sell_transactions

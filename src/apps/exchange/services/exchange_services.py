@@ -14,6 +14,7 @@ from apps.core.utils.date_time_utils import get_date_time
 from apps.core.utils.security_utils import get_client_ip
 from apps.exchange.services.transaction_service import TransactionService
 from apps.exchange.services.wallet_service import WalletService
+from apps.exchange.selectors.transaction_selectors import TransactionSelector
 
 from .price_services import PriceService
 
@@ -22,6 +23,60 @@ class ExchangeService:
 
     @staticmethod
     def buy_asset(request, asset: str, amount: int, buy_from_wallet: bool) -> dict:
+
+        """
+        Handles user-initiated gold purchase requests and creates a pending buy transaction.
+
+        This method performs all validation required at the API layer, including:
+        - Checking global and currency-specific buy availability.
+        - Ensuring no existing pending transaction exists for the user.
+        - Enforcing daily buy limits.
+        - Validating system inventory (available XAU) and user wallet balance when buying from wallet.
+        - Creating both the wallet entry (debit) and the pending transaction inside a single atomic block.
+
+        All actual settlement and gold delivery operations occur later in background workers.
+        This method only registers the user's intent and guarantees the request is safe,
+        consistent, and ready for asynchronous processing.
+
+        Parameters:
+            request (HttpRequest):
+                The authenticated request object containing the current user.
+            asset (str):
+                The asset symbol (e.g., "XAU18") the user intends to purchase.
+            amount (int):
+                The human-input amount for purchase flow. Internally interpreted
+                through `calculate_xau18_currency_price` to compute gold_amount,
+                fees, maintenance, and total IRT cost.
+            buy_from_wallet (bool):
+                If True, the total IRT amount will be debited immediately from the
+                user's wallet during this request (atomic). If False, an external
+                payment flow is expected.
+
+        Returns:
+            dict:
+                A simple acknowledgment dictionary, e.g.:
+                {"message": "درخواست خرید با موفقیت ثبت شد"}
+
+        Raises:
+            CurrencyNotBuyable:
+                - If buy operations are globally disabled.
+                - If the selected currency is not currently buyable.
+            ActionDisabled:
+                - If the user already has a pending transaction for this currency.
+                - If buying from wallet is disabled for this asset.
+            InsufficientSystemBalance:
+                - If the system's gold inventory is insufficient for the requested amount.
+            InsufficientUserBalance:
+                - If the user's IRT wallet does not have enough funds for the purchase.
+            ValidationError / Other domain exceptions:
+                - If daily limits or business rules are violated.
+
+        Notes:
+            - All inventory checks and wallet debit operations happen inside a single
+            `transaction.atomic()` block to ensure consistency and prevent race conditions.
+            - The resulting transaction will be in `pending` status until the background worker
+            processes pricing validation, settlement, and ledger-safe balance updates.
+        """
 
         site_settings = get_site_settings()
         if not site_settings.is_buy:
@@ -38,6 +93,10 @@ class ExchangeService:
         )
 
         customer = Customer.objects.get(user_id=request.user.id)
+
+        pending_transaction = TransactionSelector.get_pending_transaction(customer=customer, currency=currency)
+        if pending_transaction:
+            raise ActionDisabled('شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید.')
 
         DailyLimitService.check_daily_limit(customer, amount, 'buy')
 
@@ -75,18 +134,68 @@ class ExchangeService:
                     customer=customer,
                     currency=currency,
                     wallet=wallet_entry,
+                    deposit_method='wallet',
                     calculated_price=calculated_price,
                     ip=customer_ip,
                     timestamp=timestamp
                 )
 
-            return {'message': 'خرید با موفقیت انجام شد'}
+            return {'message': 'درخواست خرید با موفقیت ثبت شد'}
         
         else:
             pass
     
     @staticmethod
     def sell_asset(request, asset: str, amount: Decimal, card_withdaraw: bool, bank_card_id: int = None) -> dict:
+
+        """
+        Submit a sell order for a gold-based asset on behalf of the authenticated user.
+
+        This method handles the full validation and preparation workflow prior
+        to creating a pending sell transaction. If the sale is performed directly
+        into the wallet (not via bank withdrawal), the user's gold balance is
+        locked and deducted inside an atomic operation, and a matching wallet
+        entry and transaction record are created.
+
+        Main responsibilities:
+        - Validate site-level and currency-level sell availability.
+        - Calculate the sell price using PriceService.
+        - Ensure the user has no pending transactions for the same currency.
+        - Validate daily sell limits based on the resulting IRT amount.
+        - For wallet-based settlement:
+            * Lock and validate user's gold (XAU) balance.
+            * Create a gold wallet debit entry.
+            * Create the corresponding pending sell transaction.
+            * Execute all operations inside an atomic DB transaction to maintain
+              ledger consistency.
+
+        Parameters:
+            request (HttpRequest):
+                The authenticated user's request instance.
+            asset (str):
+                Currency symbol to sell (e.g., "XAU18").
+            amount (Decimal):
+                Gold amount to be sold.
+            card_withdaraw (bool):
+                If False, the sale is settled to the user's wallet.
+                If True, settlement is via bank withdrawal.
+            bank_card_id (int, optional):
+                The user's bank card ID when using withdrawal-to-card.
+
+        Returns:
+            dict:
+                A success message confirming the sell request submission.
+
+        Raises:
+            CurrencyNotBuyable:
+                If site or currency does not allow selling.
+            ActionDisabled:
+                If the user already has a pending transaction for this currency.
+            InsufficientUserBalance:
+                If the user does not have enough gold balance to complete the sale.
+            ValidationError:
+                For invalid input or limit violations.
+        """
 
         site_settings = get_site_settings()
         if not site_settings.is_sell:
@@ -103,6 +212,10 @@ class ExchangeService:
         )
 
         customer = Customer.objects.get(user_id=request.user.id)
+
+        pending_transaction = TransactionSelector.get_pending_transaction(customer=customer, currency=currency)
+        if pending_transaction:
+            raise ActionDisabled('شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید.')
 
         DailyLimitService.check_daily_limit(customer, calculated_price['data']['total_amount'], 'sell')
 
@@ -133,12 +246,13 @@ class ExchangeService:
                     customer=customer,
                     currency=currency,
                     wallet=wallet_entry,
+                    withdraw_method='wallet',
                     calculated_price=calculated_price,
                     ip=customer_ip,
                     timestamp=timestamp
                 )
 
-            return {'message': 'فروش با موفقیت انجام شد'}
+            return {'message': 'درخواست فروش با موفقیت ثبت شد'}
     
         else:
             pass
