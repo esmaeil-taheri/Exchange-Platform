@@ -11,7 +11,7 @@ from apps.accounts.exceptions.user_exceptions import (
     TwoFactorAlreadyEnabled
 )
 
-from apps.core.exceptions.base import ActionDisabled
+from apps.core.exceptions.base import ActionDisabled, PaymentGatewayError
 from apps.notifications.exceptions.notification_exceptions import (
     NotificationAlreadyRead, NotificationNotFound
 )
@@ -82,6 +82,9 @@ def custom_exception_handler(exc, context):
     
     if isinstance(exc, CeleryDispatchError):
         return _error_response(exc, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    if isinstance(exc, PaymentGatewayError):
+        return _error_response(exc, status.HTTP_503_SERVICE_UNAVAILABLE)
 
     if isinstance(exc, FailedToSendOtp):
         return _error_response(exc, status.HTTP_503_SERVICE_UNAVAILABLE)

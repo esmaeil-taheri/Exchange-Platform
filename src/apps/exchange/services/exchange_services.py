@@ -15,6 +15,7 @@ from apps.core.utils.security_utils import get_client_ip
 from apps.exchange.services.transaction_service import TransactionService
 from apps.exchange.services.wallet_service import WalletService
 from apps.exchange.selectors.transaction_selectors import TransactionSelector
+from apps.payments.services.payments_services import PaymentService
 
 from .price_services import PriceService
 
@@ -143,7 +144,15 @@ class ExchangeService:
             return {'message': 'درخواست خرید با موفقیت ثبت شد'}
         
         else:
-            pass
+            payment_data = PaymentService.create_payment_gateway_link(
+                amount=calculated_price['data']['total_amount'],
+                invoice_id=123
+            )
+
+            authority = payment_data['authority']
+            payment_link = payment_data['payment_link']
+
+            return {'message': payment_link}
     
     @staticmethod
     def sell_asset(request, asset: str, amount: Decimal, card_withdaraw: bool, bank_card_id: int = None) -> dict:

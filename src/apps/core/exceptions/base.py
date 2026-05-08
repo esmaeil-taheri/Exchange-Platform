@@ -11,3 +11,10 @@ class ActionDisabled(DomainException):
 
     def __init__(self, message=None):
         super().__init__(message or self.default_message)
+
+
+class PaymentGatewayError(InfrastrctureException):
+    default_message = "Payment Gateway Error."
+
+    def __init__(self, message=None):
+        super().__init__(message or self.default_message)
