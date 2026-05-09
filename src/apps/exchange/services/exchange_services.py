@@ -4,7 +4,7 @@ from django.db import transaction
 from apps.customers.models.customer import Customer
 from apps.site_setting.selectors.setting_selectors import get_site_settings
 from apps.exchange.exceptions.currency_exceptions import CurrencyNotBuyable
-from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance, InsufficientUserBalance
+from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance, InsufficientUserBalance, VerifiedBankCardNotFound
 from apps.exchange.services.daily_limit_services import DailyLimitService
 from apps.exchange.services.currency_balance_service import CurrencyBalanceSerivce
 from apps.exchange.selectors.currency_selectors import CurrencySelector
@@ -16,6 +16,7 @@ from apps.exchange.services.transaction_service import TransactionService
 from apps.exchange.services.wallet_service import WalletService
 from apps.exchange.selectors.transaction_selectors import TransactionSelector
 from apps.payments.services.payments_services import PaymentService
+from src.apps.customers.selectors.bank_card_selectors import BankCardSelectors
 
 from .price_services import PriceService
 
@@ -143,7 +144,23 @@ class ExchangeService:
 
             return {'message': 'درخواست خرید با موفقیت ثبت شد'}
         
-        else:
+        if not buy_from_wallet:
+
+            if not currency.buy_from_gateway:
+                raise ActionDisabled('در حال حاضر امکان خرید از درگاه وجود ندارد')
+
+            card_exists = BankCardSelectors.check_user_has_bank_card(user_id=request.user.id)
+            if not card_exists:
+                raise VerifiedBankCardNotFound('برای اتصال به درگاه میبایست کارت بانکی شما ثبت و تایید شده باشد')
+            
+
+            PaymentService.create_invoice(
+                calculated_price['data']['total_amount'],
+                authority=authority,
+                payment_link=payment_link,
+                customer=customer,
+            )
+
             payment_data = PaymentService.create_payment_gateway_link(
                 amount=calculated_price['data']['total_amount'],
                 invoice_id=123

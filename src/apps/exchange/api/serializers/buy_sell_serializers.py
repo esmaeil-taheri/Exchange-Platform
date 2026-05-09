@@ -9,6 +9,14 @@ class BuySerializer(serializers.Serializer):
     aseet = serializers.ChoiceField(choices=['XAU18'], required=True)
     buy_from_wallet = serializers.BooleanField(default=False)
 
+    def validate(self, validated_data):
+        if not validated_data['buy_from_wallet']:
+            if validated_data['amount'] < 200000 or validated_data['amount'] > 100000000:
+                raise serializers.ValidationError('افزایش اعتبار کیف پول نمیتواند کمتر از ۱۰ هزار تومان و بیشتر از ۱۰۰ میلیون باشد')
+            
+        return validated_data
+
+
     def create(self, validated_data):
         return ExchangeService.buy_asset(
             request=self.context['request'],

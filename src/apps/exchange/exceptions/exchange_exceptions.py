@@ -13,3 +13,10 @@ class InsufficientUserBalance(DomainException):
 
     def __init__(self, message=None):
         super().__init__(message or self.default_message)
+
+
+class VerifiedBankCardNotFound(DomainException):
+    default_message = 'User not have a verified bank card'
+
+    def __init__(self, message=None):
+        super().__init__(message or self.default_message)
