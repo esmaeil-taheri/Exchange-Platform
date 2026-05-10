@@ -23,6 +23,7 @@ class BankCard(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Created at')
 
+    reject_reason = models.CharField(max_length=255, blank=True, verbose_name="Reject Reason")
     ownership_counter = models.IntegerField(default=0, verbose_name="Ownership Counter")
     information_counter = models.IntegerField(default=0, verbose_name='Information Counter')
     check_again_on = models.DateTimeField(verbose_name='Check On')

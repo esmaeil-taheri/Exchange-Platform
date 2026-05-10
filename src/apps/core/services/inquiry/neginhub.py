@@ -72,15 +72,17 @@ class Inquiry_Service:
 
             response = requests.post(
                 url, headers=headers, json=payload, 
-                timeout=20
+                timeout=5
             )
             response = response.json()
 
             if response['meta']['isSuccess']:
                 if response['data']['isMatch']:
                     return True
+                else:
+                    return False
             else:
-                return False
+                raise
         except:
             raise InquiryServiceError('خطا در اتصال به سرویس احراز هویت')
     
@@ -111,10 +113,9 @@ class Inquiry_Service:
 
             response = requests.post(
                 url, headers=headers, json=payload, 
-                timeout=20
+                timeout=5
             )
             response = response.json()
-
             if response['meta']['isSuccess']:
                 
                 return response
@@ -123,3 +124,81 @@ class Inquiry_Service:
                 return False
         except:
             raise InquiryServiceError('خطا در اتصال به سرویس احراز هویت')
+        
+    def check_card_ownership(self, card_number: str, national_id: str, birthday: str):
+
+        token = self._get_token()
+        
+        if not token:
+            return False
+        
+        url = f'{self.BaseUrl}api/V5/KYC/NATIONALCODEANDCARDVERIFICATION'
+
+        headers = {
+
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        }
+        
+        payload = {
+            "NationalCode": national_id,
+            "CardNumber": card_number,
+            "BirthDate": birthday.replace('/', ''),
+            "TrackId": str(uuid.uuid4()),
+            "RequestHandlingType": 1
+        }
+
+        try:
+            response = requests.post(
+                url, headers=headers, json=payload, 
+                timeout=4
+            )
+            response = response.json()
+            
+            if response['meta']['isSuccess']:
+                if response['data']['isMatch']:
+                    return True
+                else:
+                    return False
+            else:
+                raise
+        except:
+            raise InquiryServiceError('خطا در اتصال به سرویس احراز هویت')
+
+    def get_card_information(self, card_number: str):
+        
+        token = self._get_token()
+        
+        if not token:
+            return False
+        
+        url = f'{self.BaseUrl}api/V5/KYC/CARDTOIBAN'
+
+        headers = {
+
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        }
+    
+        payload = {
+            "Card": card_number,
+            "TrackId": str(uuid.uuid4()),
+            "RequestHandlingType": 1
+        }   
+
+        try:
+            response = requests.post(
+                url, headers=headers, json=payload, 
+                timeout=4
+            )
+            response = response.json()
+            
+            if response['meta']['isSuccess']:
+                
+                return response
+
+            else:
+                return False
+        except:
+            raise InquiryServiceError('خطا در اتصال به سرویس احراز هویت')
+        
