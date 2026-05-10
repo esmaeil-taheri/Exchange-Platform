@@ -22,7 +22,7 @@ class CustomerIdentityInquirySerializer(serializers.Serializer):
 
 class CustomerKycStatusSerializer(serializers.Serializer):
     kyc_level = serializers.CharField()
-    is_verified = serializers.BooleanField()
+    is_authenticated = serializers.BooleanField()
 
 
 class CustomerKycStatusResponseSerializer(serializers.Serializer):
@@ -32,3 +32,18 @@ class CustomerKycStatusResponseSerializer(serializers.Serializer):
 
 class CustomerIdentityInquiryResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
+
+class CustomerProfileSerializer(serializers.Serializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    father_name = serializers.CharField()
+    gender = serializers.CharField()
+    phone_number = serializers.CharField()
+    national_id = serializers.CharField()
+    birthday = serializers.CharField()
+    is_authenticated = serializers.BooleanField()
+
+
+class CustomerProfileResponseSerializer(serializers.Serializer):
+    message = serializers.CharField()
+    detail = CustomerProfileSerializer()

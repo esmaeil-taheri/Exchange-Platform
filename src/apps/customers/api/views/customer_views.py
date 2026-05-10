@@ -8,12 +8,66 @@ from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 
 from apps.customers.api.serializers.customer_serailizers import (
     CustomerIdentityInquiryResponseSerializer, CustomerIdentityInquirySerializer, 
-    CustomerKycStatusResponseSerializer
+    CustomerKycStatusResponseSerializer, CustomerProfileResponseSerializer
 )
 from apps.customers.selectors.customer_selectors import CustomerSelector
 from apps.core.exceptions.open_api import ErrorSerializer
 from apps.customers.api.serializers.kyc_doc_serializers import CustomerKycUploadResponseSerializer, CustomerKycUploadSerializer
 from apps.customers.api.permissions.customer_permisions import CanUploadKycDocument
+
+
+class GetCustomerProfile(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Get customer's profile",
+        tags=['Customers'],
+        request=None,
+        description="Get customer's profile information such as first name, last name, phone number and national id.",
+        responses={
+            200: OpenApiResponse(
+                response=CustomerProfileResponseSerializer,
+                description="Customer profile information retrieved successfully.",
+                examples=[
+                    OpenApiExample(
+                        name="Successful Response Example",
+                        value={
+                            "message": "Success",
+                            "detail": {
+                                "first_name": "علی",
+                                "last_name": "رضایی",
+                                "father_name": "حسین",
+                                "gender": "مرد",
+                                "phone_number": "09123456789",
+                                "national_id": "1234567890",
+                                "birthday": "1370/01/01",
+                                "is_authenticated": True
+                            }
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=ErrorSerializer,
+                description="Error response (400, 401, 403, 409, 500)",
+                examples=[
+                    OpenApiExample(
+                        name="RegistrationDisabled",
+                        value={"detail": "Inquiry is currently disabled."}
+                    )
+                ]
+            )
+        }
+    )
+
+    def get(self, request, *args, **kwargs):
+        data = CustomerSelector.get_customer_profile(user=request.user)
+        serializer = CustomerProfileResponseSerializer(data)
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK
+        )
 
 
 class GetCustomerKycStatus(APIView):
@@ -24,7 +78,34 @@ class GetCustomerKycStatus(APIView):
         summary="Get user's kyc status",
         tags=['Customers'],
         request=None,
-        responses=CustomerKycStatusResponseSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=CustomerKycStatusResponseSerializer,
+                description="KYC status retrieved successfully.",
+                examples=[
+                    OpenApiExample(
+                        name="Successful Response Example",
+                        value={
+                            "message": "Success",
+                            "detail": {
+                                "kyc_level": "verified",
+                                "is_authenticated": True
+                            }
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=ErrorSerializer,
+                description="Error response (400, 401, 403, 409, 500)",
+                examples=[
+                    OpenApiExample(
+                        name="RegistrationDisabled",
+                        value={"detail": "Inquiry is currently disabled."}
+                    )
+                ]
+            )
+        }
     )
 
     def get(self, request, *args, **kwargs):
