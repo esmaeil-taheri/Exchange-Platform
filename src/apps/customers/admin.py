@@ -80,7 +80,7 @@ class KycDocumentInlines(admin.StackedInline):
 
 @admin.register(Kyc)
 class KycAdmin(admin.ModelAdmin):
-    list_display = ['customer', 'government_verified', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at',]
+    list_display = ['customer', 'shahkar_check', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at',]
 
     readonly_fields = ['submitted_at', 'reviewed_at']
 

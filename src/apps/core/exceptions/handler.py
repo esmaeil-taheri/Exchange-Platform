@@ -22,6 +22,7 @@ from apps.exchange.exceptions.price_exceptions import InsufficientBuyAmount, Ins
 from apps.exchange.exceptions.daily_limit_exceptions import DailyLimitExceeded
 from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance, InsufficientUserBalance, VerifiedBankCardNotFound
 from apps.core.exceptions.celery_exceptions import CeleryDispatchError
+from apps.core.exceptions.inquiry_exceptions import InquiryServiceError, KycInquiryFailed
 
 
 def custom_exception_handler(exc, context):
@@ -77,6 +78,9 @@ def custom_exception_handler(exc, context):
     if isinstance(exc, InsufficientSystemBalance):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
     
+    if isinstance(exc, KycInquiryFailed):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
+    
     if isinstance(exc, InsufficientUserBalance):
         return _error_response(exc, status.HTTP_403_FORBIDDEN)
     
@@ -87,6 +91,9 @@ def custom_exception_handler(exc, context):
         return _error_response(exc, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     if isinstance(exc, PaymentGatewayError):
+        return _error_response(exc, status.HTTP_503_SERVICE_UNAVAILABLE)
+    
+    if isinstance(exc, InquiryServiceError):
         return _error_response(exc, status.HTTP_503_SERVICE_UNAVAILABLE)
 
     if isinstance(exc, FailedToSendOtp):

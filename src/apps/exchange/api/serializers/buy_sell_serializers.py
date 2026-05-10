@@ -11,8 +11,8 @@ class BuySerializer(serializers.Serializer):
 
     def validate(self, validated_data):
         if not validated_data['buy_from_wallet']:
-            if validated_data['amount'] < 200000 or validated_data['amount'] > 100000000:
-                raise serializers.ValidationError('افزایش اعتبار کیف پول نمیتواند کمتر از ۱۰ هزار تومان و بیشتر از ۱۰۰ میلیون باشد')
+            if validated_data['amount'] < 100000 or validated_data['amount'] > 100000000:
+                raise serializers.ValidationError('افزایش اعتبار کیف پول نمیتواند کمتر از 100 هزار تومان و بیشتر از 100 میلیون باشد')
             
         return validated_data
 

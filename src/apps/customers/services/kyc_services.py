@@ -10,10 +10,10 @@ from apps.customers.exceptions.customer_exceptions import CustomerAlreadyUploade
 from apps.site_setting.selectors.setting_selectors import get_site_settings
 from apps.core.exceptions.base import ActionDisabled
 from apps.core.services.storage.minio_client import MinioClient
+from apps.core.exceptions.inquiry_exceptions import KycInquiryFailed
 
 import uuid
 import os
-
 
 
 class KycService:
@@ -22,52 +22,73 @@ class KycService:
 
     @staticmethod
     def get_customer_identity_inquiry(
-        *, user: CustomUser, national_id: str, 
+        *, user: CustomUser, national_id: str,
         first_name: str, last_name: str, birthday_date: str
     ) -> dict:
+
         setting = get_site_settings()
         if not setting.check_mobile_ownership:
             raise ActionDisabled('در حال حاضر امکان استعلام وجود ندارد')
 
-        customer = Customer.objects.get(user_id=user.id)
+        customer = Customer.objects.select_related("kyc").get(user_id=user.id)
+        kyc = customer.kyc
 
-        kyc = Kyc.objects.get(customer_id=customer.id)
-        if kyc.government_verified:
+        if customer.status == Customer.CUSTOMERSTATUS[2][0] or kyc.status not in ['not_started', 'shahkar_verified']:
             raise CustomerAlreadyVerified('کاربر قبلا احراز هویت شده')
 
-        shahkar_result = KycService.inquiry_service.check_shahkar(
+        if not kyc.shahkar_check:
+
+            shahkar_result = KycService.inquiry_service.check_shahkar(
+                national_id=national_id,
+                phone_number=customer.user.phone_number
+            )
+
+            if not shahkar_result:
+                raise KycInquiryFailed("شماره موبایل با کد ملی مطابقت ندارد")
+
+            with transaction.atomic():
+                kyc.shahkar_check = True
+                kyc.status = Kyc.Status.SHAHKAR_VERIFIED
+                kyc.save(update_fields=['shahkar_check', 'status'])
+
+        identity_data = KycService.inquiry_service.check_identity(
             national_id=national_id,
-            phone_number=customer.user.phone_number
+            birthday=birthday_date
         )
 
-        # identity_result = KycService.inquiry_service.check_identity(
-        #     national_id=national_id,
-        #     birthday=birthday_date
-        # )
+        if not identity_data:
+            raise KycInquiryFailed("اطلاعات هویتی نادرست است")
 
-        if shahkar_result:
-            with transaction.atomic():
+        data = identity_data['data']
 
-                kyc.government_verified = True
-                kyc.status = Kyc.Status.GOV_VERIFIED
-                kyc.save(update_fields=['government_verified', 'status'])
+        if not data['isAlive']:
+            customer.status = Customer.CUSTOMERSTATUS[1][0]
+            customer.save(update_fields=['status'])
+            raise KycInquiryFailed("RIP")
 
-                user.first_name = first_name
-                user.last_name = last_name
-                user.save(update_fields=['first_name', 'last_name'])
+        with transaction.atomic():
 
-                customer.birth_date = birthday_date
-                customer.save(update_fields=['birth_date'])
+            kyc.status = Kyc.Status.PENDING_UPLOAD
+            kyc.save(update_fields=['status'])
 
-                return {
-                    'message': 'احراز هویت با موفقیت انجام شد'
-                }
-                
-        else:
-            return {
-                'message': 'اطلاعات هویتی نادرست است'
-            }
-        
+            user.first_name = data['firstName']
+            user.last_name = data['lastName']
+            user.save(update_fields=['first_name', 'last_name'])
+
+            customer.gender = data['gender'].lower()
+            customer.father_name = data['fatherName']
+            customer.birth_date = birthday_date
+
+            customer.save(update_fields=[
+                'gender',
+                'father_name',
+                'birth_date'
+            ])
+
+        return {
+            'message': 'احراز هویت با موفقیت انجام شد'
+        }
+
     @staticmethod
     def _generate_object_name(user, file):
         ext = os.path.splitext(file.name)[1].lower()  # .jpg .png
@@ -82,9 +103,10 @@ class KycService:
 
         # 2. get related kyc
         kyc = customer.kyc
-        kyc_statuses = [Kyc.Status.DOCUMENT_UPLOADED, Kyc.Status.APPROVED]
+        kyc_statuses = [Kyc.Status.PENDING_REVIEW, Kyc.Status.APPROVED]
+
         if kyc.status in kyc_statuses:
-            raise CustomerAlreadyUploadedDoc('احراز هویت قبلا انجام شده')
+            raise CustomerAlreadyUploadedDoc('مدرک هویتی قبلا ثبت شده')
 
         # 3. generate storage path
         object_name = KycService._generate_object_name(user, doc)
@@ -99,7 +121,7 @@ class KycService:
             object_name=object_name
         )
 
-        kyc.status = Kyc.Status.DOCUMENT_UPLOADED
+        kyc.status = Kyc.Status.PENDING_REVIEW
         kyc.submitted_at = timezone.now()
         
         document = KycDocument.objects.create(
@@ -113,5 +135,5 @@ class KycService:
         kyc.save(update_fields=["status", "submitted_at"])
 
         return {
-            "message": "مدرک با موفقیت آپلود شد و در انتظار بررسی است"
+            "message": "مدرک هویتی با موفقیت آپلود شد و در انتظار بررسی است"
         }

@@ -1,5 +1,8 @@
+import uuid
 from django.conf import settings
 import requests
+
+from apps.core.exceptions.inquiry_exceptions import InquiryServiceError
 
 
 class Inquiry_Service:
@@ -38,10 +41,10 @@ class Inquiry_Service:
                 return res['data']['access_token']
             
             else: 
-                return None
+                return False
 
         except: 
-            return None
+            raise InquiryServiceError('خطا در اتصال به سرویس احراز هویت')
         
 
     def check_shahkar(self, national_id: str, phone_number: str):
@@ -79,7 +82,7 @@ class Inquiry_Service:
             else:
                 return False
         except:
-            return False
+            raise InquiryServiceError('خطا در اتصال به سرویس احراز هویت')
     
     
     def check_identity(self, national_id: str, birthday: str):
@@ -96,12 +99,12 @@ class Inquiry_Service:
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
         }
-        
-        payload = {
 
-            'birthDate': birthday.replace('/', ''),
-            'nationalCode': national_id,
-            'requestHandlingType': 'Standard'
+        payload = {
+            "nationalCode": national_id,
+            "birthDate": birthday.replace('/', ''),
+            "trackId": str(uuid.uuid4()),
+            "requestHandlingType": 0
         }
 
         try:
@@ -113,9 +116,10 @@ class Inquiry_Service:
             response = response.json()
 
             if response['meta']['isSuccess']:
-                if response['data']['isMatch']:
-                    return True
+                
+                return response
+
             else:
                 return False
         except:
-            return False
+            raise InquiryServiceError('خطا در اتصال به سرویس احراز هویت')

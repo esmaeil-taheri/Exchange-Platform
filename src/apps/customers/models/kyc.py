@@ -7,8 +7,9 @@ class Kyc(models.Model):
 
     class Status(models.TextChoices):
         NOT_STARTED = "not_started",
-        GOV_VERIFIED = "gov_verified",
-        DOCUMENT_UPLOADED = "document_uploaded",
+        SHAHKAR_VERIFIED = "shahkar_verified",
+        IDENTITY_VERIFIED = "identity_verified"
+        PENDING_UPLOAD = "pending_upload",
         PENDING_REVIEW = "pending_review",
         REJECTED = "rejected",
         APPROVED = "approved",
@@ -25,7 +26,7 @@ class Kyc(models.Model):
         default=Status.NOT_STARTED
     )
 
-    government_verified = models.BooleanField(
+    shahkar_check = models.BooleanField(
         default=False
     )
 

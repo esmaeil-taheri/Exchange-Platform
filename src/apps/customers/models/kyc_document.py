@@ -19,7 +19,7 @@ class KycDocument(models.Model):
         choices=Type.choices
     )
 
-    image_url = models.URLField(verbose_name='Image Url')
+    image_url = models.URLField(max_length=1000, verbose_name='Image Url')
 
     uploaded_at = models.DateTimeField(
         auto_now_add=True
