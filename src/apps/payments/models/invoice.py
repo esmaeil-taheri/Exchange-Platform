@@ -20,7 +20,7 @@ class Invoice(models.Model):
 
     payment_gateway = models.CharField(
         max_length=255, blank=True, verbose_name='Payment Gateway')
-    gateway_tack_id = models.CharField(
+    gateway_track_id = models.CharField(
         max_length=255, blank=True, verbose_name='Gateway Track ID')
     gateway_response = models.TextField(
         blank=True, verbose_name='Gateway Response')
