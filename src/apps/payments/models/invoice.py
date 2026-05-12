@@ -10,6 +10,11 @@ class Invoice(models.Model):
         ('rejected', 'Rejected'),
     )
 
+    INVOICE_TYPES = (
+        ('deposit', 'Deposit'),
+        ('buy', 'Buy'),
+    )
+
     customer = models.ForeignKey(
         'customers.Customer', on_delete=models.CASCADE, related_name='invoices', verbose_name='Customer')
 
@@ -19,6 +24,10 @@ class Invoice(models.Model):
         max_length=255, blank=True, verbose_name='Gateway Track ID')
     gateway_response = models.TextField(
         blank=True, verbose_name='Gateway Response')
+    
+    card_hash = models.CharField(max_length=255, blank=True, verbose_name='Card Hash')
+    card_pan = models.CharField(max_length=255, blank=True, verbose_name='Card PAN')
+    ref_id = models.CharField(max_length=255, blank=True, verbose_name='Reference ID')
 
     unit_price = models.BigIntegerField(default=0, verbose_name='Unit Price')
     fee = models.IntegerField(default=0, verbose_name='Fee')
@@ -29,6 +38,9 @@ class Invoice(models.Model):
     is_paid = models.BooleanField(default=False, verbose_name='Is Paid')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES,
                               default=STATUS_CHOICES[0][0], verbose_name='Status')
+    
+    invoice_type = models.CharField(max_length=20, choices=INVOICE_TYPES,
+                                default=INVOICE_TYPES[0][0], verbose_name='Invoice Type')
 
     created_at = models.DateTimeField(
         auto_now_add=True, verbose_name='Created At')
