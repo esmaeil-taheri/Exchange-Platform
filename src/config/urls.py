@@ -28,5 +28,8 @@ urlpatterns = [
     path('api/v1/customers/', include('apps.customers.urls')),
 
     # Exchange
-    path('api/v1/exchange/', include('apps.exchange.urls'))
+    path('api/v1/exchange/', include('apps.exchange.urls')),
+
+    # Payments
+    path('api/v1/payments/', include('apps.payments.urls')),
 ]

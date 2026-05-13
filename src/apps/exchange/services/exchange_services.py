@@ -168,6 +168,7 @@ class ExchangeService:
                 invoice = PaymentService.create_invoice(
                     customer=customer,
                     total_price=total_amount,
+                    invoice_type='buy',
                     unit_price=unit_price,
                     fee=calculated_price['data']['fee_toman'],
                     maintenance_fee=calculated_price['data']['maintenance_fee'],
@@ -190,7 +191,7 @@ class ExchangeService:
             invoice.payment_gateway = 'zari'
             invoice.gateway_track_id = authority
 
-            invoice.save(update_fields=['payment_gateway', 'gateway_tack_id'])
+            invoice.save(update_fields=['payment_gateway', 'gateway_track_id'])
 
             return {'message': payment_link}
         

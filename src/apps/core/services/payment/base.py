@@ -5,3 +5,7 @@ class PaymentGateway(ABC):
     @abstractmethod
     def process_payment(self, amount: float, invoice_id: int, customer) -> dict:
         pass
+
+    @abstractmethod
+    def verify_payment(self, authority: str) -> dict:
+        pass

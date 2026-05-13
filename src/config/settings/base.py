@@ -229,6 +229,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Notifications", "description": "Notification-related endpoints"},
         {"name": "Customers", "description": "Customer-related endpoints"},
         {"name": "Exchange", "description": "Exchange-related endpoints"},
+        {"name": "Payments", "description": "Payment-related endpoints"},
         {"name": "schema", "description": "Schema-related endpoints"},
     ]
 }

@@ -23,6 +23,7 @@ from apps.exchange.exceptions.daily_limit_exceptions import DailyLimitExceeded
 from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance, InsufficientUserBalance, VerifiedBankCardNotFound
 from apps.core.exceptions.celery_exceptions import CeleryDispatchError
 from apps.core.exceptions.inquiry_exceptions import InquiryServiceError, KycInquiryFailed
+from apps.payments.exceptions.payments_exceptions import InvoiceNotFound
 
 
 def custom_exception_handler(exc, context):
@@ -86,6 +87,9 @@ def custom_exception_handler(exc, context):
     
     if isinstance(exc, VerifiedBankCardNotFound):
         return _error_response(exc, status.HTTP_403_FORBIDDEN)
+    
+    if isinstance(exc, InvoiceNotFound):
+        return _error_response(exc, status.HTTP_404_NOT_FOUND)
     
     if isinstance(exc, CeleryDispatchError):
         return _error_response(exc, status.HTTP_500_INTERNAL_SERVER_ERROR)
