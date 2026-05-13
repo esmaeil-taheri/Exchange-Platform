@@ -17,3 +17,21 @@ class ZarinpalCallbackSerializer(serializers.Serializer):
         request = self.context.get('request')
         return PaymentService.handle_zarinpal_callback(validated_data['gateway_track_id'], request)
     
+
+class DepositSerializer(serializers.Serializer):
+    amount = serializers.IntegerField(
+        required=True,
+        help_text="Amount to be deposited in the user's account."
+    )
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        return PaymentService.initiate_deposit(validated_data['amount'], request)
+
+
+    def validate(self, validated_data):
+
+        if validated_data['amount'] < 100000 or validated_data['amount'] > 100000000:
+            raise serializers.ValidationError('افزایش اعتبار کیف پول نمیتواند کمتر از 100 هزار تومان و بیشتر از 100 میلیون باشد')
+            
+        return validated_data

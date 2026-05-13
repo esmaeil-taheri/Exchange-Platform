@@ -180,3 +180,44 @@ class PaymentService:
             ])
 
         return {'message': message}
+
+    @staticmethod
+    def initiate_deposit(amount: int, request) -> dict:
+        """
+        Initiate a deposit transaction for the user.
+
+        Args:
+            amount: Amount to be deposited (in Rials)
+            request: The original request object
+
+        Returns:
+            dict: Contains authority and payment_link for the deposit
+        """
+        customer = request.user.customer_profile
+        
+        invoice = PaymentService.create_invoice(
+            customer=customer,
+            total_price=amount,
+            invoice_type=Invoice.INVOICE_TYPES[0][0]  # deposit
+        )
+        try:
+            payment_data = PaymentService.create_payment_gateway_link(
+                amount=amount,
+                invoice_id=invoice.id
+            )
+        except Exception:
+            invoice.gateway_response = "gateway_failed"
+            invoice.status = "failed"
+            invoice.save(update_fields=["gateway_response", "status"])
+            raise
+
+        authority = payment_data['authority']
+        payment_link = payment_data['payment_link']
+
+        invoice.payment_gateway = 'zari'
+        invoice.gateway_track_id = authority
+
+        invoice.save(update_fields=['payment_gateway', 'gateway_track_id'])
+
+        return {'message': payment_link}
+
