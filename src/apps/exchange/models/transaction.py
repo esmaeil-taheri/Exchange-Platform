@@ -34,15 +34,15 @@ class Transaction(models.Model):
         verbose_name='currency', related_name='transactions',
         null=True
     )
-    # order = models.ForeignKey(
-    #     'exchange.Order', on_delete=models.SET_NULL,
-    #     verbose_name='Order', related_name='transaction',
-    #     null=True, blank=True
-    # )
+    invoice = models.ForeignKey(
+        'payments.Invoice', on_delete=models.SET_NULL,
+        verbose_name='Invoice', related_name='transaction',
+        null=True, blank=True
+    )
     wallet = models.ForeignKey(
         'exchange.Wallet', on_delete=models.SET_NULL,
         verbose_name='Wallet', related_name='transaction',
-        null=True
+        null=True, blank=True
     )
 
     amount = models.DecimalField(
