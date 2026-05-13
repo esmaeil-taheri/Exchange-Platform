@@ -5,8 +5,10 @@ from apps.payments.selectors.payments_selectors import PaymentsSelectors
 from apps.payments.models.invoice import Invoice
 from apps.payments.exceptions.payments_exceptions import InvoiceNotFound
 from apps.customers.models.bank_card import BankCard
+from apps.payments.tasks.payment_tasks import process_buy_invoice_task, process_deposit_invoice_task
 
 import hashlib
+
 
 
 class PaymentService:
@@ -178,9 +180,37 @@ class PaymentService:
                 'card_pan',
                 'ref_id'
             ])
+        
+        try:
+            if invoice.invoice_type == Invoice.INVOICE_TYPES[0][0]:  # deposit
+                process_deposit_invoice_task.apply_async(
+                    args=[invoice.id],
+                    retry=True,
+                    retry_policy={
+                        'max_retries': 3,
+                        'interval_start': 5,
+                        'interval_step': 10,
+                    }
+                )
+            elif invoice.invoice_type == Invoice.INVOICE_TYPES[1][0]:  # buy
+                process_buy_invoice_task.apply_async(
+                    args=[invoice.id],
+                    retry=True,
+                    retry_policy={
+                        'max_retries': 3,
+                        'interval_start': 5,
+                        'interval_step': 10,
+                    }
+                )
 
-        return {'message': message}
+            return {'message': message}
+        
+        except Exception as e:
 
+            print(f"Failed to queue task for invoice {invoice.id}")
+
+            return {'message': message}
+        
     @staticmethod
     def initiate_deposit(amount: int, request) -> dict:
         """
