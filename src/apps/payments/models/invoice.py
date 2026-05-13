@@ -42,6 +42,10 @@ class Invoice(models.Model):
     invoice_type = models.CharField(max_length=20, choices=INVOICE_TYPES,
                                 default=INVOICE_TYPES[0][0], verbose_name='Invoice Type')
 
+    is_processed = models.BooleanField(default=False, verbose_name='Is Processed')
+    processed_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Processed At')
+
     created_at = models.DateTimeField(
         auto_now_add=True, verbose_name='Created At')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Updated At')
