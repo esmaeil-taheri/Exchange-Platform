@@ -229,6 +229,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Accounts", "description": "User-related endpoints"},
         {"name": "Notifications", "description": "Notification-related endpoints"},
         {"name": "Customers", "description": "Customer-related endpoints"},
+        {"name": "Kyc", "description": "Kyc-related endpoints"},
         {"name": "Exchange", "description": "Exchange-related endpoints"},
         {"name": "Payments", "description": "Payment-related endpoints"},
         {"name": "Settlements", "description": "Settlement-related endpoints"},

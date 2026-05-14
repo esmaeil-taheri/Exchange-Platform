@@ -76,7 +76,7 @@ class GetCustomerKycStatus(APIView):
 
     @extend_schema(
         summary="Get user's kyc status",
-        tags=['Customers'],
+        tags=['Kyc'],
         request=None,
         responses={
             200: OpenApiResponse(
@@ -123,7 +123,7 @@ class CustomerIdentityInquiryApiView(APIView):
 
     @extend_schema(
         summary="Inquiry customer identity",
-        tags=['Customers'],
+        tags=['Kyc'],
         request=CustomerIdentityInquirySerializer,
         description="Inquiry customer's phone number and identity",
         responses={
@@ -173,7 +173,7 @@ class CustomerKycUploadDocApiView(APIView):
 
     @extend_schema(
         summary="Upload national card image for Kyc",
-        tags=['Customers'],
+        tags=['Kyc'],
         description=(
             "In this level user will upload national card image and wait for review"
         ),
