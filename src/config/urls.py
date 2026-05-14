@@ -32,4 +32,7 @@ urlpatterns = [
 
     # Payments
     path('api/v1/payments/', include('apps.payments.urls')),
+
+    # Settlements
+    path('api/v1/settlements/', include('apps.settlements.urls')),
 ]

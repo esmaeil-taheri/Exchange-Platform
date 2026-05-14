@@ -44,6 +44,11 @@ class Transaction(models.Model):
         verbose_name='Wallet', related_name='transaction',
         null=True, blank=True
     )
+    card = models.ForeignKey(
+        'customers.BankCard', on_delete=models.SET_NULL,
+        verbose_name='Bank Card', related_name='transaction',
+        null=True, blank=True
+    )
 
     amount = models.DecimalField(
         max_digits=20, decimal_places=8, default=0, verbose_name='Amount'

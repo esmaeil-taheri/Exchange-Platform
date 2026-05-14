@@ -266,47 +266,55 @@ class ExchangeService:
             customer=customer, currency=currency)
         if pending_transaction:
             raise ActionDisabled(
-                'شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید.')
+                'شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید')
 
         DailyLimitService.check_daily_limit(
             customer, calculated_price['data']['total_amount'], 'sell')
 
-        if not card_withdaraw:
+        withdraw_method = 'wallet'
 
-            customer_ip = get_client_ip(request)
-            timestamp = get_date_time()['timestamp']
+        customer_ip = get_client_ip(request)
+        timestamp = get_date_time()['timestamp']
 
-            with transaction.atomic():
+        with transaction.atomic():
 
-                user_wallet_balance = WalletSelector.get_user_balance_for_update(
-                    user_id=request.user.id, wallet_type='xau'
+            user_wallet_balance = WalletSelector.get_user_balance_for_update(
+                user_id=request.user.id, wallet_type='xau'
+            )
+
+            if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(user_wallet_balance)):
+                raise InsufficientUserBalance(
+                    'موجودی صندوق طلا ناکافی است')
+            
+            if card_withdaraw:
+
+                card = BankCardSelectors.get_customer_card_by_id(
+                    card_id=bank_card_id,
+                    customer_id=customer.id
                 )
 
-                if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(user_wallet_balance)):
-                    raise InsufficientUserBalance(
-                        'موجودی صندوق طلا ناکافی است')
+                withdraw_method = 'bank'
 
-                wallet_entry = WalletService.create_wallet_entry(
-                    customer=customer,
-                    wallet_type='xau',
-                    amount=Decimal(
-                        calculated_price['data']['gold_amount']) * -1,
-                    desc=f'بابت فروش {currency.fa_title}',
-                    ip=customer_ip,
-                    timestamp=timestamp
-                )
+            wallet_entry = WalletService.create_wallet_entry(
+                customer=customer,
+                wallet_type='xau',
+                amount=Decimal(
+                    calculated_price['data']['gold_amount']) * -1,
+                desc=f'بابت فروش {currency.fa_title}',
+                ip=customer_ip,
+                timestamp=timestamp
+            )
 
-                TransactionService.create_sell_transaction(
-                    customer=customer,
-                    currency=currency,
-                    wallet=wallet_entry,
-                    withdraw_method='wallet',
-                    calculated_price=calculated_price,
-                    ip=customer_ip,
-                    timestamp=timestamp
-                )
+            TransactionService.create_sell_transaction(
+                customer=customer,
+                currency=currency,
+                wallet=wallet_entry,
+                card=card if withdraw_method == 'bank' else None,
+                withdraw_method=withdraw_method,
+                calculated_price=calculated_price,
+                ip=customer_ip,
+                timestamp=timestamp
+            )
 
-            return {'message': 'درخواست فروش با موفقیت ثبت شد'}
-
-        else:
-            pass
+        return {'message': 'درخواست فروش با موفقیت ثبت شد'}
+    

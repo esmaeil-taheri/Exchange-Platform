@@ -8,7 +8,8 @@ from apps.core.utils.date_time_utils import get_date_time
 
 from apps.exchange.models.wallet import Wallet
 from apps.exchange.selectors.wallet_selectors import WalletSelector
-from src.apps.exchange.services.price_services import PriceService
+from apps.exchange.services.price_services import PriceService
+from apps.settlements.services.settlement_services import SettlementService
 
 
 transaction_processed = Signal()
@@ -275,116 +276,116 @@ def process_sell_transactions():
 
         transaction_total_price = int(trans.amount * trans.unit_price_irt) - trans.fee_irt
 
-        if trans.withdraw_method == Transaction.WITHDRAWTYPES[0][0]:
+        with transaction.atomic():
 
-            with transaction.atomic():
+            trans = Transaction.objects.select_for_update(skip_locked=True).filter(
+                id=trans.id,
+                status='pending'
+            ).first()
 
-                trans = Transaction.objects.select_for_update(skip_locked=True).filter(
-                    id=trans.id,
-                    status='pending'
-                ).first()
+            if trans is None:
+                continue
 
-                if trans is None:
-                    continue
+            wallet = trans.wallet
+            wallet_amount = abs(wallet.amount)
+            customer = trans.customer
+            currency = trans.currency
+            last_price = CurrencyPriceLog.objects.filter(currency=currency).last()
 
-                wallet = trans.wallet
-                wallet_amount = abs(wallet.amount)
-                customer = trans.customer
-                currency = trans.currency
-                last_price = CurrencyPriceLog.objects.filter(currency=currency).last()
-
-                customer_xau_balance = WalletSelector.get_user_balance_for_update(
-                    user_id=customer.user.id,
-                    wallet_type=Wallet.WALLETTYPES[1][0]
-                )
-                if customer_xau_balance < 0:
-                    trans.is_checked = True
-                    trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
-                    trans.reject_reason = "Negative XAU balance"
-                    trans.save()
-                
-                    transaction.on_commit(lambda: transaction_processed.send(
-                        sender='exchange', transaction_id=trans.id, status=trans.status)
-                    )
-
-                    continue
-
-                if transaction_total_price != trans.total_price_irt:
-                    trans.is_checked = True
-                    trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
-                    trans.reject_reason = "Transaction total price is not match"
-                    trans.save()
-
-                    Wallet.objects.create(
-                        customer=customer,
-                        wallet_type=Wallet.WALLETTYPES[1][0],
-                        amount=wallet_amount,
-                        desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
-                        created_at=now_ts,
-                        verified_at=now_ts,
-                        ip = "0.0.0.0",
-                        is_verified=True
-                    )
-
-                    transaction.on_commit(lambda: transaction_processed.send(
-                        sender='exchange', transaction_id=trans.id, status=trans.status)
-                    )
-
-                    continue
-
-                if trans.amount != wallet_amount:
-                    trans.is_checked = True
-                    trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
-                    trans.reject_reason = "Transaction amount is not match"
-                    trans.save()
-
-                    
-                    Wallet.objects.create(
-                        customer=customer,
-                        wallet_type=Wallet.WALLETTYPES[1][0],
-                        amount=wallet_amount,
-                        desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
-                        created_at=now_ts,
-                        verified_at=now_ts,
-                        ip = "0.0.0.0",
-                        is_verified=True
-                    )
-
-                    transaction.on_commit(lambda: transaction_processed.send(
-                        sender='exchange', transaction_id=trans.id, status=trans.status)
-                    )
-
-                    continue
-
-                if trans.unit_price_irt > last_price.price and abs(last_price.price - trans.unit_price_irt) > (trans.unit_price_irt / 100):
-                    trans.is_checked = True
-                    trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
-                    trans.reject_reason = "Transaction unit price is not match with last price"
-                    trans.save()
-
-                    
-                    Wallet.objects.create(
-                        customer=customer,
-                        wallet_type=Wallet.WALLETTYPES[1][0],
-                        amount=wallet_amount,
-                        desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
-                        created_at=now_ts,
-                        verified_at=now_ts,
-                        ip = "0.0.0.0",
-                        is_verified=True
-                    )
-
-                    transaction.on_commit(lambda: transaction_processed.send(
-                        sender='exchange', transaction_id=trans.id, status=trans.status)
-                    )
-
-                    continue
-
-
+            customer_xau_balance = WalletSelector.get_user_balance_for_update(
+                user_id=customer.user.id,
+                wallet_type=Wallet.WALLETTYPES[1][0]
+            )
+            if customer_xau_balance < 0:
                 trans.is_checked = True
-                trans.status = Transaction.TRANSACTIONSTATUSES[1][0]
-                trans.processed_at = now_ts
+                trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
+                trans.reject_reason = "Negative XAU balance"
                 trans.save()
+            
+                transaction.on_commit(lambda: transaction_processed.send(
+                    sender='exchange', transaction_id=trans.id, status=trans.status)
+                )
+
+                continue
+
+            if transaction_total_price != trans.total_price_irt:
+                trans.is_checked = True
+                trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
+                trans.reject_reason = "Transaction total price is not match"
+                trans.save()
+
+                Wallet.objects.create(
+                    customer=customer,
+                    wallet_type=Wallet.WALLETTYPES[1][0],
+                    amount=wallet_amount,
+                    desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
+                    created_at=now_ts,
+                    verified_at=now_ts,
+                    ip = "0.0.0.0",
+                    is_verified=True
+                )
+
+                transaction.on_commit(lambda: transaction_processed.send(
+                    sender='exchange', transaction_id=trans.id, status=trans.status)
+                )
+
+                continue
+
+            if trans.amount != wallet_amount:
+                trans.is_checked = True
+                trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
+                trans.reject_reason = "Transaction amount is not match"
+                trans.save()
+
+                
+                Wallet.objects.create(
+                    customer=customer,
+                    wallet_type=Wallet.WALLETTYPES[1][0],
+                    amount=wallet_amount,
+                    desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
+                    created_at=now_ts,
+                    verified_at=now_ts,
+                    ip = "0.0.0.0",
+                    is_verified=True
+                )
+
+                transaction.on_commit(lambda: transaction_processed.send(
+                    sender='exchange', transaction_id=trans.id, status=trans.status)
+                )
+
+                continue
+
+            if trans.unit_price_irt > last_price.price and abs(last_price.price - trans.unit_price_irt) > (trans.unit_price_irt / 100):
+                trans.is_checked = True
+                trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
+                trans.reject_reason = "Transaction unit price is not match with last price"
+                trans.save()
+
+                
+                Wallet.objects.create(
+                    customer=customer,
+                    wallet_type=Wallet.WALLETTYPES[1][0],
+                    amount=wallet_amount,
+                    desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
+                    created_at=now_ts,
+                    verified_at=now_ts,
+                    ip = "0.0.0.0",
+                    is_verified=True
+                )
+
+                transaction.on_commit(lambda: transaction_processed.send(
+                    sender='exchange', transaction_id=trans.id, status=trans.status)
+                )
+
+                continue
+
+
+            trans.is_checked = True
+            trans.status = Transaction.TRANSACTIONSTATUSES[1][0]
+            trans.processed_at = now_ts
+            trans.save()
+
+            if trans.withdraw_method == Transaction.WITHDRAWTYPES[0][0]: # Wallet
 
                 Wallet.objects.create(
                     customer=customer,
@@ -402,6 +403,20 @@ def process_sell_transactions():
                 )
 
                 continue
+            
+            if trans.withdraw_method == Transaction.WITHDRAWTYPES[1][0]: # Bank
 
-        if trans.withdraw_method == Transaction.WITHDRAWTYPES[1][0]:
-            pass
+                customer_irt_balance = WalletSelector.get_user_balance_for_update(
+                    user_id=customer.user.id,
+                    wallet_type=Wallet.WALLETTYPES[0][0]
+                )
+
+                SettlementService.create_withdrawal_request(
+                    customer=customer,
+                    card=trans.card,
+                    amount=transaction_total_price,
+                    method='Vandar',
+                    remaining_wallet_amount=customer_irt_balance
+                )
+
+                continue

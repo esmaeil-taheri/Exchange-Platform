@@ -28,7 +28,7 @@ class TransactionService:
         )
     
     @staticmethod
-    def create_sell_transaction(customer, currency, wallet, withdraw_method, calculated_price, ip, timestamp):
+    def create_sell_transaction(customer, currency, wallet, withdraw_method, calculated_price, ip, timestamp, card=None):
 
         return Transaction.objects.create(
             customer=customer,
@@ -42,6 +42,7 @@ class TransactionService:
             fee_irt=calculated_price['data']['fee_toman'],
             unit_price_irt=calculated_price['data']['price_per_gram'],
             total_price_irt=calculated_price['data']['total_amount'],
+            card=card if card else None,
             ip=ip,
             withdraw_method=withdraw_method,
             deposit_method=Transaction.DEPOSITTYPES[0][0],

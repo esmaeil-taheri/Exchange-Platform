@@ -47,7 +47,8 @@ INSTALLED_APPS = [
     "apps.admins.apps.SiteAdminsConfig",
     "apps.notifications.apps.NotificationsConfig",
     "apps.exchange.apps.ExchangeConfig",
-    "apps.payments.apps.PaymentsConfig"
+    "apps.payments.apps.PaymentsConfig",
+    "apps.settlements.apps.SettlementsConfig",
 ]
 
 MIDDLEWARE = [
@@ -230,6 +231,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Customers", "description": "Customer-related endpoints"},
         {"name": "Exchange", "description": "Exchange-related endpoints"},
         {"name": "Payments", "description": "Payment-related endpoints"},
+        {"name": "Settlements", "description": "Settlement-related endpoints"},
         {"name": "schema", "description": "Schema-related endpoints"},
     ]
 }

@@ -1,4 +1,5 @@
 from apps.customers.models.bank_card import BankCard
+from apps.customers.exceptions.bank_card_exceptions import BankCardNotFound
 
 
 class BankCardSelectors:
@@ -18,3 +19,16 @@ class BankCardSelectors:
             is_verified=True
 
         ).exists()
+
+    @staticmethod
+    def get_customer_card_by_id(card_id: int, customer_id: int):
+        try:
+            card = BankCard.objects.get(
+                id=card_id,
+                customer__id=customer_id,
+                is_show=True,
+                is_verified=True
+            )
+            return card
+        except BankCard.DoesNotExist:
+            raise BankCardNotFound('کارت بانکی یافت نشد')
