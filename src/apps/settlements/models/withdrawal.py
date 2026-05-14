@@ -1,6 +1,8 @@
 from django.db import models
 from django.db.models import Q
 
+from apps.core.utils.date_time_utils import to_jalali
+
 
 class Withdrawal(models.Model):
 
@@ -198,3 +200,15 @@ class Withdrawal(models.Model):
 
     def __str__(self):
         return f'Withdrawal #{self.pk} - {self.amount}'
+
+    @property
+    def confirmed_at_jalali(self):
+        if self.confirmed_at:
+            return to_jalali(self.confirmed_at)
+        return "-"
+    
+    @property
+    def created_at_jalali(self):
+        if self.created_at:
+            return to_jalali(self.created_at)
+        return "-"
