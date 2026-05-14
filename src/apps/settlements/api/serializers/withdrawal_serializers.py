@@ -2,6 +2,11 @@ from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 
 from apps.settlements.models.withdrawal import Withdrawal
+from apps.settlements.services.settlement_services import SettlementService
+
+
+class WithdrawalBaseMessageSerializer(serializers.Serializer):
+    message = serializers.CharField()
 
 
 class WithdrawalSerializer(serializers.ModelSerializer):
@@ -47,3 +52,26 @@ class WithdrawalSerializer(serializers.ModelSerializer):
 class WithdrawalDetailSerializer(serializers.Serializer):
     message = serializers.CharField()
     data = WithdrawalSerializer()
+
+
+class WithdrawSerializer(serializers.Serializer):
+    amount = serializers.IntegerField(
+        required=True,
+        help_text="Amount to be deposited in the user's account."
+    )
+    card_id = serializers.IntegerField(required=True)
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        return SettlementService.initiate_withdrawal_request(
+            validated_data['amount'], 
+            validated_data['card_id'],
+            request
+        )
+
+    def validate(self, validated_data):
+
+        if validated_data['amount'] < 100000 or validated_data['amount'] > 100000000:
+            raise serializers.ValidationError('مبلغ برداشت نمیتواند کمتر از 100 هزار تومان و بیشتر از 100 میلیون باشد')
+            
+        return validated_data

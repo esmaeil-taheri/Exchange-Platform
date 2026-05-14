@@ -1,13 +1,15 @@
 from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
+from rest_framework import status
 # from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 from apps.settlements.models.withdrawal import Withdrawal
 from apps.settlements.selectors.withdrawal_selectors import WithdrawalSelectors
-from apps.settlements.api.serializers.withdrawal_serializers import WithdrawalDetailSerializer, WithdrawalSerializer
+from apps.settlements.api.serializers.withdrawal_serializers import WithdrawSerializer, WithdrawalBaseMessageSerializer, WithdrawalDetailSerializer, WithdrawalSerializer
 from apps.core.pagination import StandardResultsSetPagination
 from apps.core.exceptions.open_api import ErrorSerializer
 
@@ -139,3 +141,50 @@ class WithdrawalDetailApiView(RetrieveAPIView):
             "message": "success",
             "data": serializer.data
         })
+
+
+class CreateWithdrawalRequest(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Create withdrawal request",
+        tags=['Settlements'],
+        description="Create a new withdrawal request for the authenticated customer.",
+        request=WithdrawSerializer,
+        responses={
+            201: OpenApiResponse(
+                response=WithdrawalBaseMessageSerializer,
+                description="Withdrawal request created successfully",
+                examples=[
+                    OpenApiExample(
+                        name="Successful withdrawal request",
+                        value={
+                            "message": "Withdrawal request created successfully"
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=ErrorSerializer,
+                description="Error response (400, 401, 403, 409, 500)",
+                examples=[
+                    OpenApiExample(
+                        name="Validation Error",
+                        value={
+                            "detail": "Insufficient wallet balance."
+                        }
+                    )
+                ]
+            )
+        }
+    )
+
+    def post(self, request, *args, **kwargs):
+        serializer = WithdrawSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        return Response(
+            data,
+            status=status.HTTP_200_OK
+        )
