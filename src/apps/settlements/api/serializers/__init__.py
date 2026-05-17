@@ -1,6 +1,5 @@
-from .withdrawal_serializers import WithdrawalListSerializer, WithdrawalDetailSerializer
+from .withdrawal_serializers import WithdrawalDetailSerializer
 
 __all__ = [
-    'WithdrawalListSerializer',
     'WithdrawalDetailSerializer',
 ]

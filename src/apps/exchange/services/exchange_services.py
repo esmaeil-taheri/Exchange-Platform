@@ -16,7 +16,7 @@ from apps.exchange.services.transaction_service import TransactionService
 from apps.exchange.services.wallet_service import WalletService
 from apps.exchange.selectors.transaction_selectors import TransactionSelector
 from apps.payments.services.payments_services import PaymentService
-from src.apps.customers.selectors.bank_card_selectors import BankCardSelectors
+from apps.customers.selectors.bank_card_selectors import BankCardSelectors
 
 from .price_services import PriceService
 

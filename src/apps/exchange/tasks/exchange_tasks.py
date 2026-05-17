@@ -10,6 +10,7 @@ from apps.exchange.models.wallet import Wallet
 from apps.exchange.selectors.wallet_selectors import WalletSelector
 from apps.exchange.services.price_services import PriceService
 from apps.settlements.services.settlement_services import SettlementService
+from apps.settlements.tasks.settlement_tasks import process_withdrawal_requests
 
 
 transaction_processed = Signal()
@@ -411,7 +412,7 @@ def process_sell_transactions():
                     wallet_type=Wallet.WALLETTYPES[0][0]
                 )
 
-                SettlementService.create_withdrawal_request(
+                withdrawal = SettlementService.create_withdrawal_request(
                     customer=customer,
                     card=trans.card,
                     amount=transaction_total_price,
@@ -419,4 +420,15 @@ def process_sell_transactions():
                     remaining_wallet_amount=customer_irt_balance
                 )
 
-                continue
+                try:
+
+                    process_withdrawal_requests.apply_async(
+                        args=[withdrawal.id],
+                        countdown=10 
+                    )
+
+                except:
+
+                    print(f"Failed to queue task for withdrawal {withdrawal.id}")
+
+                    continue

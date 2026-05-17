@@ -8,6 +8,7 @@ from apps.exchange.exceptions.exchange_exceptions import InsufficientUserBalance
 from apps.exchange.services.wallet_service import WalletService
 from apps.core.utils.date_time_utils import get_date_time
 from apps.core.utils.security_utils import get_client_ip
+from apps.settlements.tasks.settlement_tasks import process_withdrawal_requests
 
 
 class SettlementService:
@@ -57,5 +58,17 @@ class SettlementService:
                 ip=customer_ip,
                 timestamp=timestamp
             )
+
+        try:
+            process_withdrawal_requests.apply_async(
+                args=[withdrawal.id],
+                countdown=10
+            )
+
+            return {"message": "درخواست برداشت با موفقیت ثبت شد"}
+        
+        except Exception as e:
+
+            print(f"Failed to queue task for withdrawal {withdrawal.id}")
 
             return {"message": "درخواست برداشت با موفقیت ثبت شد"}
