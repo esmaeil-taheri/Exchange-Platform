@@ -38,7 +38,7 @@ class BankCard(models.Model):
     
     @property
     def check_again_jalali(self):
-        return to_jalali(self.check_again)
+        return to_jalali(self.check_again_on)
 
     def __str__(self):
         return self.card_number

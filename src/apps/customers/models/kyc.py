@@ -8,7 +8,7 @@ class Kyc(models.Model):
     class Status(models.TextChoices):
         NOT_STARTED = "not_started",
         SHAHKAR_VERIFIED = "shahkar_verified",
-        IDENTITY_VERIFIED = "identity_verified"
+        IDENTITY_VERIFIED = "identity_verified",
         PENDING_UPLOAD = "pending_upload",
         PENDING_REVIEW = "pending_review",
         REJECTED = "rejected",

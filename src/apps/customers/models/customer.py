@@ -44,11 +44,22 @@ class Customer(models.Model):
         return self.user.get_full_name()
 
     @property
-    def kyc_overall_rate(self):
-        steps = (
-            self.uploaded_id_card,
-            self.rules_accepted,
-            self.information_completion,
-            self.auth_check_ready,
-        )
-        return int(sum(steps) / len(steps) * 100)
+    def kyc_overall_rate(self) -> int:
+        """
+        Returns KYC completion percentage based on the current KYC status.
+        Maps each state in the KYC state machine to a progress percentage.
+        Returns 0 if the customer has no KYC record yet.
+        """
+        STATUS_PROGRESS = {
+            "not_started":       0,
+            "shahkar_verified":  25,
+            "identity_verified": 50,
+            "pending_upload":    50,
+            "pending_review":    75,
+            "approved":          100,
+            "rejected":          0,
+        }
+        try:
+            return STATUS_PROGRESS.get(self.kyc.status, 0)
+        except Exception:
+            return 0
