@@ -1,4 +1,8 @@
+import logging
+
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class VandarClient:
@@ -52,9 +56,15 @@ class VandarClient:
 
             return data
 
-        except requests.exceptions.RequestException as e:
-            return {"error": True, "message": str(e)}
-
+        except requests.exceptions.Timeout:
+            logger.error("[vandar] refresh_token — request timed out")
+            return {"error": True, "message": "Request timed out"}
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"[vandar] refresh_token — connection error | error={e}")
+            return {"error": True, "message": "Connection error"}
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"[vandar] refresh_token — HTTP error | status={e.response.status_code}")
+            return {"error": True, "message": f"HTTP {e.response.status_code}"}
 
     def get_balance(self):
         url = f"{self.base_url}/v2/business/{self.business}/balance"
@@ -78,8 +88,15 @@ class VandarClient:
 
             return mock_response
 
-        except Exception as e:
-            return {"error": True, "message": str(e)}
+        except requests.exceptions.Timeout:
+            logger.error("[vandar] get_balance — request timed out")
+            return {"error": True, "message": "Request timed out"}
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"[vandar] get_balance — connection error | error={e}")
+            return {"error": True, "message": "Connection error"}
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"[vandar] get_balance — HTTP error | status={e.response.status_code}")
+            return {"error": True, "message": f"HTTP {e.response.status_code}"}
 
     def create_settlement(
         self,
@@ -156,8 +173,15 @@ class VandarClient:
 
             return mock_response
 
-        except Exception as e:
-            return {"error": True, "message": str(e)}
+        except requests.exceptions.Timeout:
+            logger.error(f"[vandar] create_settlement — request timed out | track_id={track_id}")
+            return {"error": True, "message": "Request timed out"}
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"[vandar] create_settlement — connection error | track_id={track_id} error={e}")
+            return {"error": True, "message": "Connection error"}
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"[vandar] create_settlement — HTTP error | track_id={track_id} status={e.response.status_code}")
+            return {"error": True, "message": f"HTTP {e.response.status_code}"}
 
     def inquiry_settlement(self, track_id):
         url = f"{self.base_url}/v4/business/{self.business}/settlement/{track_id}"
@@ -197,8 +221,15 @@ class VandarClient:
 
             return mock_response
 
-        except Exception as e:
-            return {"error": True, "message": str(e)}
+        except requests.exceptions.Timeout:
+            logger.error(f"[vandar] inquiry_settlement — request timed out | track_id={track_id}")
+            return {"error": True, "message": "Request timed out"}
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"[vandar] inquiry_settlement — connection error | track_id={track_id} error={e}")
+            return {"error": True, "message": "Connection error"}
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"[vandar] inquiry_settlement — HTTP error | track_id={track_id} status={e.response.status_code}")
+            return {"error": True, "message": f"HTTP {e.response.status_code}"}
 
     def cancel_settlement(self, track_id, cancel_mode="PENDING"):
         url = f"{self.base_url}/v4/business/{self.business}/settlement/{track_id}"
@@ -247,5 +278,12 @@ class VandarClient:
 
             return mock_response
 
-        except Exception as e:
-            return {"error": True, "message": str(e)}
+        except requests.exceptions.Timeout:
+            logger.error(f"[vandar] cancel_settlement — request timed out | track_id={track_id}")
+            return {"error": True, "message": "Request timed out"}
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"[vandar] cancel_settlement — connection error | track_id={track_id} error={e}")
+            return {"error": True, "message": "Connection error"}
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"[vandar] cancel_settlement — HTTP error | track_id={track_id} status={e.response.status_code}")
+            return {"error": True, "message": f"HTTP {e.response.status_code}"}
