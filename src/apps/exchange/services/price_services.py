@@ -71,7 +71,7 @@ class PriceService:
                 # ------------------------------
                 #    Mintenance Fee
                 # ------------------------------
-                maintance_fee = (currency.maintance_fee * gold_amount).quantize(
+                maintenance_fee = (currency.maintenance_fee * gold_amount).quantize(
                     Decimal("1"), rounding=ROUND_HALF_UP
                 )
 
@@ -85,7 +85,7 @@ class PriceService:
                 # ------------------------------
                 #    Total Amount
                 # ------------------------------
-                total_amount = gold_price_toman + buy_fee + maintance_fee
+                total_amount = gold_price_toman + buy_fee + maintenance_fee
 
                 # If total_amount is less than or equal to the original amount, we can break the loop
                 if total_amount <= amount:
@@ -103,7 +103,7 @@ class PriceService:
                     "amount": str(amount),
                     "total_amount": int(total_amount),
                     "gold_amount": str(gold_amount),
-                    "maintenance_fee": int(maintance_fee),
+                    "maintenance_fee": int(maintenance_fee),
                     "net_amount": int(net_amount),
                     "fee_toman": int(buy_fee),
                     "price_per_gram": price_log.price,
@@ -221,18 +221,18 @@ class PriceService:
         # ------------------------------
         #    maintenance fee
         # ------------------------------
-        maintance_fee = (currency.maintance_fee * gold_amount).quantize(
+        maintenance_fee = (currency.maintenance_fee * gold_amount).quantize(
             Decimal("1"), rounding=ROUND_HALF_UP
         )
 
         # ------------------------------
         #     total
         # ------------------------------
-        total_amount = gold_price_toman + buy_fee + maintance_fee
+        total_amount = gold_price_toman + buy_fee + maintenance_fee
 
         return {
             "gold_price": int(gold_price_toman),
             "fee": int(buy_fee),
-            "maintenance": int(maintance_fee),
+            "maintenance": int(maintenance_fee),
             "total": int(total_amount),
         }

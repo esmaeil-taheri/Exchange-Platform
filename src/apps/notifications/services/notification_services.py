@@ -1,6 +1,5 @@
 from django.db import transaction
 from django.utils import timezone
-from django.db import transaction
 
 from apps.notifications.models.notif_template import NotificationTemplate
 from apps.notifications.models.notification import Notification

@@ -20,7 +20,7 @@ from apps.core.pagination import StandardResultsSetPagination
     )
 )
 
-class GetNotificationsListApiVie(ListAPIView):
+class GetNotificationsListApiView(ListAPIView):
     serializer_class = NotificationListResponseSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination

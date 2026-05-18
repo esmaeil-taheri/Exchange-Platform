@@ -44,5 +44,5 @@ class CurrencyBalance(models.Model):
         return to_jalali(self.modified_at)
 
     @property
-    def modified_by_by(self):
-        return 'admin' if self.modified_by else 'robot'
+    def modified_by_label(self):
+        return 'admin' if self.modified_by.exists() else 'robot'

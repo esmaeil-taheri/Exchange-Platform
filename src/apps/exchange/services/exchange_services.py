@@ -6,7 +6,7 @@ from apps.site_setting.selectors.setting_selectors import get_site_settings
 from apps.exchange.exceptions.currency_exceptions import CurrencyNotBuyable
 from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance, InsufficientUserBalance, VerifiedBankCardNotFound
 from apps.exchange.services.daily_limit_services import DailyLimitService
-from apps.exchange.services.currency_balance_service import CurrencyBalanceSerivce
+from apps.exchange.services.currency_balance_service import CurrencyBalanceService
 from apps.exchange.selectors.currency_selectors import CurrencySelector
 from apps.exchange.selectors.wallet_selectors import WalletSelector
 from apps.core.exceptions.base import ActionDisabled
@@ -114,7 +114,7 @@ class ExchangeService:
 
             with transaction.atomic():
 
-                available_balance = CurrencyBalanceSerivce.calculate_available_balance_for_update(
+                available_balance = CurrencyBalanceService.calculate_available_balance_for_update(
                     symbol=asset)
                 if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(available_balance)):
                     raise InsufficientSystemBalance(

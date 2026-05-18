@@ -28,7 +28,7 @@ SECRET_KEY = config("SECRET_KEY")
 # Application definition
 
 INSTALLED_APPS = [
-    # 'jazzmin',
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -357,6 +357,10 @@ JAZZMIN_SETTINGS = {
 
         # Site Setting
         "site_setting.SiteSetting": "fas fa-gears",
+
+        "payments.Invoice": "fas fa-file-invoice-dollar",
+        "settlements.Withdrawal": "fas fa-money-bill-transfer",
+
     }
 
 }

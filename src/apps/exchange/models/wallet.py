@@ -29,7 +29,7 @@ class Wallet(models.Model):
     verified_at = models.BigIntegerField(null=True, blank=True, verbose_name='Verified At')
 
     is_rejected = models.BooleanField(default=False, verbose_name='Is Rejected')
-    reject_reson = models.CharField(max_length=350, blank=True, verbose_name='Rejected Reason')
+    reject_reason = models.CharField(max_length=350, blank=True, verbose_name='Rejected Reason')
 
     ip = models.GenericIPAddressField(default='0.0.0.0', verbose_name='Ip Address')
     created_at =  models.BigIntegerField(verbose_name='Created at Timestamp')

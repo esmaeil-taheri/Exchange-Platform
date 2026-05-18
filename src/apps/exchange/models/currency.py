@@ -38,9 +38,9 @@ class Currency(models.Model):
         verbose_name='Sell Fee '
     )
 
-    maintance_fee = models.DecimalField(
+    maintenance_fee = models.DecimalField(
         max_digits=20, decimal_places=8, default=0,
-        verbose_name='Maintance Fee'
+        verbose_name='Maintenance Fee'
     )
 
     is_sell = models.BooleanField(default=False, verbose_name='Sell Is Enabled')

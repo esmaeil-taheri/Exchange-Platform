@@ -2,7 +2,7 @@ from apps.exchange.selectors.currency_balance_selectors import CurrencyBalanceSe
 from apps.exchange.selectors.transaction_selectors import TransactionSelector
 
 
-class CurrencyBalanceSerivce:
+class CurrencyBalanceService:
 
     @staticmethod
     def calculate_available_balance_for_update(symbol: str):

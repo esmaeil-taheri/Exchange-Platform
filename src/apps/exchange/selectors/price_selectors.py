@@ -115,7 +115,7 @@ class PriceSelector:
 
         buy_sell_fee = currency.fixed_buy_fee_toman
 
-        buy_fee = buy_sell_fee + int((currency.maintance_fee * lowest_buy))
+        buy_fee = buy_sell_fee + int((currency.maintenance_fee * lowest_buy))
         lower_buy_price = int(last.price * lowest_buy) + buy_fee
 
         lower_sell_price = int(last.price * lowest_sell) - buy_sell_fee
