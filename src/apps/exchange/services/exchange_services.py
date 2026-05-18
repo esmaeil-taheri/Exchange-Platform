@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.db import transaction
 
 from apps.customers.models.customer import Customer
+from apps.customers.exceptions.customer_exceptions import CustomerSuspended
 from apps.site_setting.selectors.setting_selectors import get_site_settings
 from apps.exchange.exceptions.currency_exceptions import CurrencyNotBuyable
 from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance, InsufficientUserBalance, VerifiedBankCardNotFound
@@ -105,6 +106,12 @@ class ExchangeService:
         )
 
         customer = Customer.objects.get(user_id=user_id)
+
+        if customer.status == 'suspended':
+            logger.warning(
+                f"Buy blocked — account suspended | user_id={user_id} asset={asset}"
+            )
+            raise CustomerSuspended('حساب کاربری شما مسدود شده است و امکان انجام تراکنش وجود ندارد')
 
         pending_transaction = TransactionSelector.get_pending_transaction(
             customer=customer, currency=currency)
@@ -304,6 +311,12 @@ class ExchangeService:
         )
 
         customer = Customer.objects.get(user_id=user_id)
+
+        if customer.status == 'suspended':
+            logger.warning(
+                f"Sell blocked — account suspended | user_id={user_id} asset={asset}"
+            )
+            raise CustomerSuspended('حساب کاربری شما مسدود شده است و امکان انجام تراکنش وجود ندارد')
 
         pending_transaction = TransactionSelector.get_pending_transaction(
             customer=customer, currency=currency)

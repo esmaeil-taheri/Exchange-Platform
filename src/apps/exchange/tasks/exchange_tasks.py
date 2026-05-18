@@ -109,6 +109,13 @@ def process_buy_transactions():
             customer = trans.customer
             last_price = CurrencyPriceLog.objects.filter(currency=currency).last()
 
+            if last_price is None:
+                logger.error(
+                    f"[task=process_buy] No price log found — skipping | "
+                    f"transaction_id={trans.id} currency={currency.symbol}"
+                )
+                continue
+
             customer_irt_balance = WalletSelector.get_user_balance_for_update(
                 user_id=customer.user.id,
                 wallet_type=Wallet.WALLETTYPES[0][0]
@@ -314,6 +321,13 @@ def process_sell_transactions():
             customer = trans.customer
             currency = trans.currency
             last_price = CurrencyPriceLog.objects.filter(currency=currency).last()
+
+            if last_price is None:
+                logger.error(
+                    f"[task=process_sell] No price log found — skipping | "
+                    f"transaction_id={trans.id} currency={currency.symbol}"
+                )
+                continue
 
             customer_xau_balance = WalletSelector.get_user_balance_for_update(
                 user_id=customer.user.id,

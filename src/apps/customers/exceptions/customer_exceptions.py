@@ -13,3 +13,10 @@ class CustomerAlreadyUploadedDoc(DomainException):
 
     def __init__(self, message=None):
         super().__init__(message or self.default_message)
+
+
+class CustomerSuspended(DomainException):
+    default_message = "This account has been suspended and cannot perform transactions."
+
+    def __init__(self, message=None):
+        super().__init__(message or self.default_message)

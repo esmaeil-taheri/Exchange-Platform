@@ -1,10 +1,12 @@
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
-from django.conf import settings 
+from django.conf import settings
 
 from apps.settlements.models.withdrawal import Withdrawal
 from apps.core.services.settlement.vandar import VandarClient
+from apps.exchange.models.wallet import Wallet
+from apps.core.utils.date_time_utils import get_date_time
 
 import logging
 
@@ -64,12 +66,27 @@ def process_withdrawal_requests(self, withdrawal_id):
 
                 error_message = response.get("message", "Unknown PSP error")
 
+                now_ts = get_date_time()['timestamp']
+
                 withdrawal.status = Withdrawal.WithdrawalStatus.FAILED
                 withdrawal.errors = error_message
                 withdrawal.save(update_fields=["status", "errors"])
 
+                Wallet.objects.create(
+                    customer=withdrawal.customer,
+                    wallet_type='irt',
+                    amount=withdrawal.amount,
+                    desc=f'برگشت وجه بابت شکست تسویه — درخواست برداشت #{withdrawal.id}',
+                    ip='system',
+                    created_at=now_ts,
+                    verified_at=now_ts,
+                    is_verified=True,
+                )
+
                 logger.error(
-                    f"Settlement failed for withdrawal {withdrawal_id}: {error_message}"
+                    f"[task=process_withdrawal] Settlement FAILED — IRT refunded | "
+                    f"withdrawal_id={withdrawal_id} customer_id={withdrawal.customer_id} "
+                    f"amount={withdrawal.amount}IRT reason={error_message}"
                 )
 
                 return f"PSP Error: {error_message}"
@@ -152,11 +169,33 @@ def inquiry_processed_withdrawals():
                     withdrawal.status = Withdrawal.WithdrawalStatus.COMPLETED
                     withdrawal.is_verified = True
                     withdrawal.confirmed_at = timezone.now()
+                    logger.info(
+                        f"[task=inquiry_withdrawal] Settlement COMPLETED | "
+                        f"withdrawal_id={withdrawal.id} customer_id={withdrawal.customer_id} "
+                        f"amount={withdrawal.amount}IRT"
+                    )
 
                 elif status in ["FAILED", "CANCELED"]:
                     withdrawal.status = Withdrawal.WithdrawalStatus.FAILED
                     withdrawal.is_verified = False
                     withdrawal.reject_reason = status
+
+                    now_ts = get_date_time()['timestamp']
+                    Wallet.objects.create(
+                        customer=withdrawal.customer,
+                        wallet_type='irt',
+                        amount=withdrawal.amount,
+                        desc=f'برگشت وجه بابت رد شدن تسویه — درخواست برداشت #{withdrawal.id}',
+                        ip='system',
+                        created_at=now_ts,
+                        verified_at=now_ts,
+                        is_verified=True,
+                    )
+                    logger.warning(
+                        f"[task=inquiry_withdrawal] Settlement {status} — IRT refunded | "
+                        f"withdrawal_id={withdrawal.id} customer_id={withdrawal.customer_id} "
+                        f"amount={withdrawal.amount}IRT"
+                    )
 
                 withdrawal.save(
                     update_fields=[

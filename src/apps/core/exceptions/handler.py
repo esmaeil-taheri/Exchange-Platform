@@ -15,7 +15,7 @@ from apps.core.exceptions.base import ActionDisabled, PaymentGatewayError
 from apps.notifications.exceptions.notification_exceptions import (
     NotificationAlreadyRead, NotificationNotFound
 )
-from apps.customers.exceptions.customer_exceptions import CustomerAlreadyUploadedDoc, CustomerAlreadyVerified
+from apps.customers.exceptions.customer_exceptions import CustomerAlreadyUploadedDoc, CustomerAlreadyVerified, CustomerSuspended
 from apps.customers.exceptions.bank_card_exceptions import BankCardNotFound, BankCardAlreadyExists
 from apps.exchange.exceptions.currency_exceptions import CurrencyNotBuyable
 from apps.exchange.exceptions.price_exceptions import InsufficientBuyAmount, InsufficientSellAmount
@@ -53,6 +53,9 @@ def custom_exception_handler(exc, context):
         return _error_response(exc, status.HTTP_400_BAD_REQUEST)
     
     if isinstance(exc, CustomerAlreadyUploadedDoc):
+        return _error_response(exc, status.HTTP_403_FORBIDDEN)
+
+    if isinstance(exc, CustomerSuspended):
         return _error_response(exc, status.HTTP_403_FORBIDDEN)
     
     if isinstance(exc, BankCardAlreadyExists):
