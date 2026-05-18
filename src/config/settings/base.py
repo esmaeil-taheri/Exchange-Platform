@@ -62,6 +62,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "django_prometheus.middleware.PrometheusAfterMiddleware",
+    # ─── Request ID tracing ───
+    "apps.core.middlewares.request_id_middleware.RequestIdMiddleware",
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -270,6 +272,10 @@ ZARINPAL_CALLBACK_URL = config('ZARINPAL_CALLBACK_URL')
 # Settlements
 VANDAR_API_KEY = config('VANDAR_API_KEY')
 VANDAR_BUSINESS_NAME = config('VANDAR_BUSINESS_NAME')
+
+# ─── Logging ────────────────────────────────────────────────────────────────
+from config.logging_config import LOGGING  # noqa: E402
+LOGGING = LOGGING
 
 # Jazzmin
 

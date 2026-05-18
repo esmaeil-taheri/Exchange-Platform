@@ -9,6 +9,9 @@ from apps.exchange.services.wallet_service import WalletService
 from apps.core.utils.date_time_utils import get_date_time
 from apps.core.utils.security_utils import get_client_ip
 from apps.settlements.tasks.settlement_tasks import process_withdrawal_requests
+from apps.core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class SettlementService:
@@ -25,23 +28,31 @@ class SettlementService:
 
     @staticmethod
     def initiate_withdrawal_request(amount, card_id, request):
+        user_id = request.user.id
+        logger.info(
+            f"Withdrawal request initiated | user_id={user_id} amount={amount}IRT card_id={card_id}"
+        )
 
-        customer = Customer.objects.get(user_id=request.user.id)
+        customer = Customer.objects.get(user_id=user_id)
         card = BankCardSelectors.get_customer_card_by_id(
             card_id=card_id, customer_id=customer.id
         )
 
         customer_ip = get_client_ip(request)
         timestamp = get_date_time()['timestamp']
-        
+
         with transaction.atomic():
             user_wallet_balance = WalletSelector.get_user_balance_for_update(
-                user_id=request.user.id, wallet_type='irt'
+                user_id=user_id, wallet_type='irt'
             )
 
             if amount > int(user_wallet_balance):
+                logger.warning(
+                    f"Withdrawal blocked — insufficient balance | user_id={user_id} "
+                    f"requested={amount}IRT balance={user_wallet_balance}IRT"
+                )
                 raise InsufficientUserBalance('موجودی کیف پول ناکافی است')
-            
+
             withdrawal = SettlementService.create_withdrawal_request(
                 customer=customer,
                 card=card,
@@ -59,16 +70,24 @@ class SettlementService:
                 timestamp=timestamp
             )
 
+        logger.info(
+            f"Withdrawal created — IRT debited | user_id={user_id} "
+            f"withdrawal_id={withdrawal.id} amount={amount}IRT remaining={user_wallet_balance - amount}IRT"
+        )
+
         try:
             process_withdrawal_requests.apply_async(
                 args=[withdrawal.id],
                 countdown=10
             )
-
+            logger.info(
+                f"Withdrawal task queued | withdrawal_id={withdrawal.id} user_id={user_id}"
+            )
             return {"message": "درخواست برداشت با موفقیت ثبت شد"}
-        
+
         except Exception as e:
-
-            print(f"Failed to queue task for withdrawal {withdrawal.id}")
-
+            logger.error(
+                f"Failed to queue withdrawal task | withdrawal_id={withdrawal.id} "
+                f"user_id={user_id} error={e}"
+            )
             return {"message": "درخواست برداشت با موفقیت ثبت شد"}

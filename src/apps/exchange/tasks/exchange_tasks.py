@@ -1,3 +1,5 @@
+import logging
+
 from celery import shared_task
 from django.db import transaction
 from django.dispatch import Signal
@@ -12,6 +14,7 @@ from apps.exchange.services.price_services import PriceService
 from apps.settlements.services.settlement_services import SettlementService
 from apps.settlements.tasks.settlement_tasks import process_withdrawal_requests
 
+logger = logging.getLogger(__name__)
 
 transaction_processed = Signal()
 
@@ -74,6 +77,7 @@ def process_buy_transactions():
         created_at__lt=now_ts
     ).order_by('created_at')[:3]
 
+    logger.info(f"[task=process_buy] Batch started | pending_count={pendings.count()}")
 
     for trans in pendings:
 
@@ -115,20 +119,21 @@ def process_buy_transactions():
                 trans.reject_reason = "Negative IRT balance"
                 trans.processed_at = now_ts
                 trans.save()
-
+                logger.warning(
+                    f"[task=process_buy] Transaction REJECTED — negative IRT balance | "
+                    f"transaction_id={trans.id} customer_id={customer.id}"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
-                
+
             if transaction_total_price['total'] != trans.total_price_irt:
                 trans.is_checked = True
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction total price is not match"
                 trans.processed_at = now_ts
                 trans.save()
-
                 Wallet.objects.create(
                     customer=customer,
                     wallet_type=Wallet.WALLETTYPES[0][0],
@@ -136,23 +141,26 @@ def process_buy_transactions():
                     desc=f"بابت برگشت خرید ناموفق: {currency.fa_title}",
                     created_at=now_ts,
                     verified_at=now_ts,
-                    ip = "1.1.1.1",
+                    ip="1.1.1.1",
                     is_verified=True
                 )
-
+                logger.warning(
+                    f"[task=process_buy] Transaction REJECTED — price mismatch | "
+                    f"transaction_id={trans.id} customer_id={customer.id} "
+                    f"expected={transaction_total_price['total']} got={trans.total_price_irt} "
+                    f"refund={wallet_amount}IRT"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
-            
+
             if trans.total_price_irt != wallet_amount:
                 trans.is_checked = True
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction total price and wallet amount are not match"
                 trans.processed_at = now_ts
                 trans.save()
-
                 Wallet.objects.create(
                     customer=customer,
                     wallet_type=Wallet.WALLETTYPES[0][0],
@@ -160,24 +168,26 @@ def process_buy_transactions():
                     desc=f"بابت برگشت خرید ناموفق: {currency.fa_title}",
                     created_at=now_ts,
                     verified_at=now_ts,
-                    ip = "1.1.1.1",
+                    ip="1.1.1.1",
                     is_verified=True
                 )
-
+                logger.warning(
+                    f"[task=process_buy] Transaction REJECTED — wallet/price mismatch | "
+                    f"transaction_id={trans.id} customer_id={customer.id} "
+                    f"total_price={trans.total_price_irt} wallet_amount={wallet_amount} "
+                    f"refund={wallet_amount}IRT"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
 
             if trans.unit_price_irt < last_price.price and abs(last_price.price - trans.unit_price_irt) > (trans.unit_price_irt / 100):
-
                 trans.is_checked = True
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction unit price is not match with last price"
                 trans.processed_at = now_ts
                 trans.save()
-
                 Wallet.objects.create(
                     customer=customer,
                     wallet_type=Wallet.WALLETTYPES[0][0],
@@ -185,16 +195,20 @@ def process_buy_transactions():
                     desc=f"بابت برگشت خرید ناموفق: {currency.fa_title}",
                     created_at=now_ts,
                     verified_at=now_ts,
-                    ip = "1.1.1.1",
+                    ip="1.1.1.1",
                     is_verified=True
                 )
-
+                logger.warning(
+                    f"[task=process_buy] Transaction REJECTED — unit price deviation >1% | "
+                    f"transaction_id={trans.id} customer_id={customer.id} "
+                    f"order_price={trans.unit_price_irt} market_price={last_price.price} "
+                    f"refund={wallet_amount}IRT"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
-            
+
             trans.is_checked = True
             trans.status = Transaction.TRANSACTIONSTATUSES[1][0]
             trans.processed_at = now_ts
@@ -207,8 +221,14 @@ def process_buy_transactions():
                 desc=f'خرید {currency.fa_title} به شماره فاکتور : {trans.id}',
                 created_at=now_ts,
                 verified_at=now_ts,
-                ip = "1.1.1.1",
+                ip="1.1.1.1",
                 is_verified=True
+            )
+
+            logger.info(
+                f"[task=process_buy] Transaction SUCCESS — XAU credited | "
+                f"transaction_id={trans.id} customer_id={customer.id} "
+                f"gold={trans.amount}g total={trans.total_price_irt}IRT"
             )
 
             transaction.on_commit(lambda: transaction_processed.send(
@@ -272,7 +292,9 @@ def process_sell_transactions():
         is_checked=False,
         created_at__lt=now_ts
     ).order_by('created_at')[:3]
-    
+
+    logger.info(f"[task=process_sell] Batch started | pending_count={pendings.count()}")
+
     for trans in pendings:
 
         transaction_total_price = int(trans.amount * trans.unit_price_irt) - trans.fee_irt
@@ -302,11 +324,13 @@ def process_sell_transactions():
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Negative XAU balance"
                 trans.save()
-            
+                logger.warning(
+                    f"[task=process_sell] Transaction REJECTED — negative XAU balance | "
+                    f"transaction_id={trans.id} customer_id={customer.id}"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
 
             if transaction_total_price != trans.total_price_irt:
@@ -314,7 +338,6 @@ def process_sell_transactions():
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction total price is not match"
                 trans.save()
-
                 Wallet.objects.create(
                     customer=customer,
                     wallet_type=Wallet.WALLETTYPES[1][0],
@@ -322,14 +345,18 @@ def process_sell_transactions():
                     desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
                     created_at=now_ts,
                     verified_at=now_ts,
-                    ip = "0.0.0.0",
+                    ip="1.1.1.1",
                     is_verified=True
                 )
-
+                logger.warning(
+                    f"[task=process_sell] Transaction REJECTED — price mismatch | "
+                    f"transaction_id={trans.id} customer_id={customer.id} "
+                    f"expected={transaction_total_price} got={trans.total_price_irt} "
+                    f"refund={wallet_amount}g XAU"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
 
             if trans.amount != wallet_amount:
@@ -337,8 +364,6 @@ def process_sell_transactions():
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction amount is not match"
                 trans.save()
-
-                
                 Wallet.objects.create(
                     customer=customer,
                     wallet_type=Wallet.WALLETTYPES[1][0],
@@ -346,14 +371,18 @@ def process_sell_transactions():
                     desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
                     created_at=now_ts,
                     verified_at=now_ts,
-                    ip = "0.0.0.0",
+                    ip="1.1.1.1",
                     is_verified=True
                 )
-
+                logger.warning(
+                    f"[task=process_sell] Transaction REJECTED — amount/wallet mismatch | "
+                    f"transaction_id={trans.id} customer_id={customer.id} "
+                    f"trans_amount={trans.amount} wallet_amount={wallet_amount} "
+                    f"refund={wallet_amount}g XAU"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
 
             if trans.unit_price_irt > last_price.price and abs(last_price.price - trans.unit_price_irt) > (trans.unit_price_irt / 100):
@@ -361,8 +390,6 @@ def process_sell_transactions():
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction unit price is not match with last price"
                 trans.save()
-
-                
                 Wallet.objects.create(
                     customer=customer,
                     wallet_type=Wallet.WALLETTYPES[1][0],
@@ -370,24 +397,26 @@ def process_sell_transactions():
                     desc=f"بابت برگشت فروش ناموفق: {currency.fa_title}",
                     created_at=now_ts,
                     verified_at=now_ts,
-                    ip = "0.0.0.0",
+                    ip="1.1.1.1",
                     is_verified=True
                 )
-
+                logger.warning(
+                    f"[task=process_sell] Transaction REJECTED — unit price deviation >1% | "
+                    f"transaction_id={trans.id} customer_id={customer.id} "
+                    f"order_price={trans.unit_price_irt} market_price={last_price.price} "
+                    f"refund={wallet_amount}g XAU"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
-
 
             trans.is_checked = True
             trans.status = Transaction.TRANSACTIONSTATUSES[1][0]
             trans.processed_at = now_ts
             trans.save()
 
-            if trans.withdraw_method == Transaction.WITHDRAWTYPES[0][0]: # Wallet
-
+            if trans.withdraw_method == Transaction.WITHDRAWTYPES[0][0]:  # Wallet
                 Wallet.objects.create(
                     customer=customer,
                     wallet_type=Wallet.WALLETTYPES[0][0],
@@ -395,40 +424,44 @@ def process_sell_transactions():
                     desc=f'فروش {currency.fa_title} به شماره فاکتور : {trans.id}',
                     created_at=now_ts,
                     verified_at=now_ts,
-                    ip = "1.1.1.1",
+                    ip="1.1.1.1",
                     is_verified=True
                 )
-
+                logger.info(
+                    f"[task=process_sell] Transaction SUCCESS — IRT credited to wallet | "
+                    f"transaction_id={trans.id} customer_id={customer.id} "
+                    f"gold={trans.amount}g irt={trans.total_price_irt}IRT"
+                )
                 transaction.on_commit(lambda: transaction_processed.send(
                     sender='exchange', transaction_id=trans.id, status=trans.status)
                 )
-
                 continue
-            
-            if trans.withdraw_method == Transaction.WITHDRAWTYPES[1][0]: # Bank
 
+            if trans.withdraw_method == Transaction.WITHDRAWTYPES[1][0]:  # Bank
                 customer_irt_balance = WalletSelector.get_user_balance_for_update(
                     user_id=customer.user.id,
                     wallet_type=Wallet.WALLETTYPES[0][0]
                 )
-
                 withdrawal = SettlementService.create_withdrawal_request(
                     customer=customer,
                     card=trans.card,
                     amount=transaction_total_price,
-                    method='Vandar',
+                    method='پایا',
                     remaining_wallet_amount=customer_irt_balance
                 )
-
+                logger.info(
+                    f"[task=process_sell] Withdrawal request created for bank settlement | "
+                    f"transaction_id={trans.id} withdrawal_id={withdrawal.id} "
+                    f"customer_id={customer.id} amount={transaction_total_price}IRT"
+                )
                 try:
-
                     process_withdrawal_requests.apply_async(
                         args=[withdrawal.id],
-                        countdown=10 
+                        countdown=10
                     )
-
-                except:
-
-                    print(f"Failed to queue task for withdrawal {withdrawal.id}")
-
+                except Exception as e:
+                    logger.error(
+                        f"[task=process_sell] Failed to queue withdrawal task | "
+                        f"transaction_id={trans.id} withdrawal_id={withdrawal.id} error={e}"
+                    )
                     continue

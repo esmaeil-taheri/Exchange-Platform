@@ -19,6 +19,9 @@ from apps.payments.services.payments_services import PaymentService
 from apps.customers.selectors.bank_card_selectors import BankCardSelectors
 
 from .price_services import PriceService
+from apps.core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ExchangeService:
@@ -79,12 +82,20 @@ class ExchangeService:
             processes pricing validation, settlement, and ledger-safe balance updates.
         """
 
+        user_id = request.user.id
+        logger.info(
+            f"Buy request initiated | user_id={user_id} asset={asset} "
+            f"amount={amount} method={'wallet' if buy_from_wallet else 'gateway'}"
+        )
+
         site_settings = get_site_settings()
         if not site_settings.is_buy:
+            logger.warning(f"Buy blocked — globally disabled | user_id={user_id} asset={asset}")
             raise CurrencyNotBuyable("در حال حاضر امکان خرید وجود ندارد")
 
         currency = CurrencySelector.get_currency_by_symbol(symbol=asset)
         if not currency.is_buy:
+            logger.warning(f"Buy blocked — currency disabled | user_id={user_id} asset={asset}")
             raise CurrencyNotBuyable("در حال حاضر امکان خرید وجود ندارد")
 
         calculated_price = PriceService.calculate_xau18_currency_price(
@@ -93,11 +104,14 @@ class ExchangeService:
             transaction_type='buy'
         )
 
-        customer = Customer.objects.get(user_id=request.user.id)
+        customer = Customer.objects.get(user_id=user_id)
 
         pending_transaction = TransactionSelector.get_pending_transaction(
             customer=customer, currency=currency)
         if pending_transaction:
+            logger.warning(
+                f"Buy blocked — pending transaction exists | user_id={user_id} asset={asset}"
+            )
             raise ActionDisabled(
                 'شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید.')
 
@@ -106,8 +120,8 @@ class ExchangeService:
         if buy_from_wallet:
 
             if not currency.buy_from_wallet:
-                raise ActionDisabled(
-                    'در حال حاضر امکان خرید از کیف پول وجود ندارد')
+                logger.warning(f"Buy blocked — wallet method disabled | user_id={user_id} asset={asset}")
+                raise ActionDisabled('در حال حاضر امکان خرید از کیف پول وجود ندارد')
 
             customer_ip = get_client_ip(request)
             timestamp = get_date_time()['timestamp']
@@ -117,14 +131,21 @@ class ExchangeService:
                 available_balance = CurrencyBalanceService.calculate_available_balance_for_update(
                     symbol=asset)
                 if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(available_balance)):
-                    raise InsufficientSystemBalance(
-                        'میزان درخواستی بیشتر از موجودی فعلی است')
+                    logger.warning(
+                        f"Buy blocked — insufficient system balance | user_id={user_id} asset={asset} "
+                        f"requested={calculated_price['data']['gold_amount']} available={available_balance}"
+                    )
+                    raise InsufficientSystemBalance('میزان درخواستی بیشتر از موجودی فعلی است')
 
                 user_wallet_balance = WalletSelector.get_user_balance_for_update(
-                    user_id=request.user.id, wallet_type='irt'
+                    user_id=user_id, wallet_type='irt'
                 )
 
                 if int(calculated_price['data']['total_amount']) > int(user_wallet_balance):
+                    logger.warning(
+                        f"Buy blocked — insufficient user balance | user_id={user_id} "
+                        f"required={calculated_price['data']['total_amount']} balance={user_wallet_balance}"
+                    )
                     raise InsufficientUserBalance('موجودی کیف پول ناکافی است')
 
                 wallet_entry = WalletService.create_wallet_entry(
@@ -146,17 +167,24 @@ class ExchangeService:
                     timestamp=timestamp
                 )
 
+            logger.info(
+                f"Buy order registered (wallet) | user_id={user_id} asset={asset} "
+                f"gold={calculated_price['data']['gold_amount']}g "
+                f"total={calculated_price['data']['total_amount']}IRT"
+            )
             return {'message': 'درخواست خرید با موفقیت ثبت شد'}
 
         if not buy_from_wallet:
 
             if not currency.buy_from_gateway:
+                logger.warning(f"Buy blocked — gateway method disabled | user_id={user_id} asset={asset}")
                 raise ActionDisabled('در حال حاضر امکان خرید از درگاه وجود ندارد')
 
-            card_exists = BankCardSelectors.check_user_has_bank_card(
-                user_id=request.user.id
-            )
+            card_exists = BankCardSelectors.check_user_has_bank_card(user_id=user_id)
             if not card_exists:
+                logger.warning(
+                    f"Buy blocked — no verified bank card | user_id={user_id} asset={asset}"
+                )
                 raise VerifiedBankCardNotFound(
                     'برای اتصال به درگاه میبایست کارت بانکی شما ثبت و تایید شده باشد'
                 )
@@ -179,7 +207,11 @@ class ExchangeService:
                     amount=total_amount,
                     invoice_id=invoice.id
                 )
-            except Exception:
+            except Exception as e:
+                logger.error(
+                    f"Gateway link creation FAILED | user_id={user_id} asset={asset} "
+                    f"invoice_id={invoice.id} error={e}"
+                )
                 invoice.gateway_response = "gateway_failed"
                 invoice.status = "failed"
                 invoice.save(update_fields=["gateway_response", "status"])
@@ -190,9 +222,12 @@ class ExchangeService:
 
             invoice.payment_gateway = 'zari'
             invoice.gateway_track_id = authority
-
             invoice.save(update_fields=['payment_gateway', 'gateway_track_id'])
 
+            logger.info(
+                f"Buy order gateway invoice created | user_id={user_id} asset={asset} "
+                f"invoice_id={invoice.id} amount={total_amount}IRT authority={authority}"
+            )
             return {'message': payment_link}
         
     @staticmethod
@@ -246,12 +281,20 @@ class ExchangeService:
                 For invalid input or limit violations.
         """
 
+        user_id = request.user.id
+        logger.info(
+            f"Sell request initiated | user_id={user_id} asset={asset} "
+            f"amount={amount}g withdraw={'bank' if card_withdaraw else 'wallet'}"
+        )
+
         site_settings = get_site_settings()
         if not site_settings.is_sell:
+            logger.warning(f"Sell blocked — globally disabled | user_id={user_id} asset={asset}")
             raise CurrencyNotBuyable("در حال حاضر امکان فروش وجود ندارد")
 
         currency = CurrencySelector.get_currency_by_symbol(symbol=asset)
         if not currency.is_sell:
+            logger.warning(f"Sell blocked — currency disabled | user_id={user_id} asset={asset}")
             raise CurrencyNotBuyable("در حال حاضر امکان فروش وجود ندارد")
 
         calculated_price = PriceService.calculate_xau18_currency_price(
@@ -260,46 +303,47 @@ class ExchangeService:
             transaction_type='sell'
         )
 
-        customer = Customer.objects.get(user_id=request.user.id)
+        customer = Customer.objects.get(user_id=user_id)
 
         pending_transaction = TransactionSelector.get_pending_transaction(
             customer=customer, currency=currency)
         if pending_transaction:
-            raise ActionDisabled(
-                'شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید')
+            logger.warning(
+                f"Sell blocked — pending transaction exists | user_id={user_id} asset={asset}"
+            )
+            raise ActionDisabled('شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید')
 
         DailyLimitService.check_daily_limit(
             customer, calculated_price['data']['total_amount'], 'sell')
 
         withdraw_method = 'wallet'
-
         customer_ip = get_client_ip(request)
         timestamp = get_date_time()['timestamp']
 
         with transaction.atomic():
 
             user_wallet_balance = WalletSelector.get_user_balance_for_update(
-                user_id=request.user.id, wallet_type='xau'
+                user_id=user_id, wallet_type='xau'
             )
 
             if Decimal(calculated_price['data']['gold_amount']) > Decimal(str(user_wallet_balance)):
-                raise InsufficientUserBalance(
-                    'موجودی صندوق طلا ناکافی است')
-            
-            if card_withdaraw:
+                logger.warning(
+                    f"Sell blocked — insufficient XAU balance | user_id={user_id} "
+                    f"required={calculated_price['data']['gold_amount']}g balance={user_wallet_balance}g"
+                )
+                raise InsufficientUserBalance('موجودی صندوق طلا ناکافی است')
 
+            if card_withdaraw:
                 card = BankCardSelectors.get_customer_card_by_id(
                     card_id=bank_card_id,
                     customer_id=customer.id
                 )
-
                 withdraw_method = 'bank'
 
             wallet_entry = WalletService.create_wallet_entry(
                 customer=customer,
                 wallet_type='xau',
-                amount=Decimal(
-                    calculated_price['data']['gold_amount']) * -1,
+                amount=Decimal(calculated_price['data']['gold_amount']) * -1,
                 desc=f'بابت فروش {currency.fa_title}',
                 ip=customer_ip,
                 timestamp=timestamp
@@ -316,5 +360,10 @@ class ExchangeService:
                 timestamp=timestamp
             )
 
+        logger.info(
+            f"Sell order registered | user_id={user_id} asset={asset} "
+            f"gold={calculated_price['data']['gold_amount']}g "
+            f"total={calculated_price['data']['total_amount']}IRT withdraw={withdraw_method}"
+        )
         return {'message': 'درخواست فروش با موفقیت ثبت شد'}
     

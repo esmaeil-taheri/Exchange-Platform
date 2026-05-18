@@ -9,6 +9,9 @@ from apps.payments.tasks.payment_tasks import process_buy_invoice_task, process_
 
 import hashlib
 
+from apps.core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class PaymentService:
@@ -47,6 +50,11 @@ class PaymentService:
             status='pending',
             is_paid=False,
         )
+
+        logger.info(
+            f"Invoice created | invoice_id={invoice.id} customer_id={customer.id} "
+            f"type={invoice_type} total={total_price}IRT fee={fee}IRT"
+        )
         return invoice
 
     @staticmethod
@@ -78,13 +86,20 @@ class PaymentService:
             dict: Response message for the user
         """
 
+        logger.info(f"Zarinpal callback received | authority={gateway_track_id}")
+
         invoice = PaymentsSelectors.get_invoice_by_authority(gateway_track_id)
 
         if not invoice:
+            logger.warning(f"Zarinpal callback — invoice not found | authority={gateway_track_id}")
             raise InvoiceNotFound('تراکنش یافت نشد')
 
         # Quick idempotency check (without lock)
         if invoice.is_paid:
+            logger.info(
+                f"Zarinpal callback — invoice already paid (idempotent) | "
+                f"invoice_id={invoice.id} authority={gateway_track_id}"
+            )
             return {'message': 'این فاکتور قبلاً پرداخت شده است'}
 
         customer = invoice.customer
@@ -161,11 +176,20 @@ class PaymentService:
             # Update based on card validation
             if card_is_valid:
                 invoice.is_paid = True
-                invoice.status = Invoice.STATUS_CHOICES[1][0] # successs
+                invoice.status = Invoice.STATUS_CHOICES[1][0]  # paid
                 message = 'پرداخت با موفقیت انجام شد'
+                logger.info(
+                    f"Payment verified and accepted | invoice_id={invoice.id} "
+                    f"customer_id={invoice.customer_id} ref_id={ref_id} "
+                    f"amount={invoice.total_price}IRT card_pan={card_pan}"
+                )
             else:
                 invoice.status = Invoice.STATUS_CHOICES[3][0]  # rejected
                 message = 'کارت پرداخت کننده مجاز نیست'
+                logger.warning(
+                    f"Payment rejected — card hash mismatch | invoice_id={invoice.id} "
+                    f"customer_id={invoice.customer_id} card_pan={card_pan}"
+                )
 
             invoice.gateway_response = str(verification_result)
             invoice.card_hash = card_hash
@@ -206,9 +230,10 @@ class PaymentService:
             return {'message': message}
         
         except Exception as e:
-
-            print(f"Failed to queue task for invoice {invoice.id}")
-
+            logger.error(
+                f"Failed to queue processing task | invoice_id={invoice.id} "
+                f"type={invoice.invoice_type} error={e}"
+            )
             return {'message': message}
         
     @staticmethod
@@ -224,6 +249,11 @@ class PaymentService:
             dict: Contains authority and payment_link for the deposit
         """
         customer = request.user.customer_profile
+
+        logger.info(
+            f"Deposit request received | customer_id={customer.id} "
+            f"user_id={request.user.id} amount={amount}IRT"
+        )
         
         invoice = PaymentService.create_invoice(
             customer=customer,
@@ -239,6 +269,12 @@ class PaymentService:
             invoice.gateway_response = "gateway_failed"
             invoice.status = "failed"
             invoice.save(update_fields=["gateway_response", "status"])
+
+            logger.error(
+                f"Gateway creation failed | invoice_id={invoice.id} "
+                f"customer_id={customer.id} amount={amount}IRT"
+            )
+
             raise
 
         authority = payment_data['authority']
@@ -248,6 +284,14 @@ class PaymentService:
         invoice.gateway_track_id = authority
 
         invoice.save(update_fields=['payment_gateway', 'gateway_track_id'])
+
+
+        logger.info(
+            f"Payment gateway created | invoice_id={invoice.id} "
+            f"customer_id={customer.id} authority={authority} "
+            f"amount={amount}IRT gateway=zari"
+        )
+
 
         return {'message': payment_link}
 
