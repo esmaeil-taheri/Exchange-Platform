@@ -14,6 +14,7 @@ from apps.customers.selectors.customer_selectors import CustomerSelector
 from apps.core.exceptions.open_api import ErrorSerializer
 from apps.customers.api.serializers.kyc_doc_serializers import CustomerKycUploadResponseSerializer, CustomerKycUploadSerializer
 from apps.customers.api.permissions.customer_permisions import CanUploadKycDocument
+from apps.core.decorators.rate_limit import rate_limit
 
 
 class GetCustomerProfile(APIView):
@@ -152,6 +153,7 @@ class CustomerIdentityInquiryApiView(APIView):
         }
     )
 
+    @rate_limit(scope='kyc_inquiry_user', limit=3, window=3600, key='user')
     def post(self, request, *args, **kwargs):
         serializer = CustomerIdentityInquirySerializer(
             data=request.data,
@@ -204,6 +206,7 @@ class CustomerKycUploadDocApiView(APIView):
         }
     )
 
+    @rate_limit(scope='kyc_upload_user', limit=5, window=3600, key='user')
     def post(self, request, *args, **kwargs):
         serializer = CustomerKycUploadSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)

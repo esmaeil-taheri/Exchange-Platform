@@ -7,6 +7,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from apps.payments.api.serializers.payments_serializers import BaseMessageSerializer, DepositSerializer, ZarinpalCallbackSerializer
 from apps.core.exceptions.open_api import ErrorSerializer
+from apps.core.decorators.rate_limit import rate_limit
 
 
 class ZarinpalCallbackApiView(APIView):
@@ -40,7 +41,8 @@ class ZarinpalCallbackApiView(APIView):
             )
         }
     )
-    def post(self, *args, **kwargs):
+    @rate_limit(scope='zarinpal_callback_ip', limit=20, window=60, key='ip')
+    def post(self, request, *args, **kwargs):
         serializer = ZarinpalCallbackSerializer(data=self.request.data, context={'request': self.request})
         serializer.is_valid(raise_exception=True)
         data = serializer.save()
@@ -80,7 +82,8 @@ class DepositApiView(APIView):
             )
         }
     )
-    def post(self, *args, **kwargs):
+    @rate_limit(scope='deposit_user', limit=3, window=300, key='user')
+    def post(self, request, *args, **kwargs):
         serializer = DepositSerializer(data=self.request.data, context={'request': self.request})
         serializer.is_valid(raise_exception=True)
         data = serializer.save()

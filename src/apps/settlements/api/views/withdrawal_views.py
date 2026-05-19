@@ -12,6 +12,7 @@ from apps.settlements.selectors.withdrawal_selectors import WithdrawalSelectors
 from apps.settlements.api.serializers.withdrawal_serializers import WithdrawSerializer, WithdrawalBaseMessageSerializer, WithdrawalDetailSerializer, WithdrawalSerializer
 from apps.core.pagination import StandardResultsSetPagination
 from apps.core.exceptions.open_api import ErrorSerializer
+from apps.core.decorators.rate_limit import rate_limit
 
 
 @extend_schema_view(
@@ -180,6 +181,7 @@ class CreateWithdrawalRequest(APIView):
         }
     )
 
+    @rate_limit(scope='withdrawal_user', limit=3, window=600, key='user')
     def post(self, request, *args, **kwargs):
         serializer = WithdrawSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)

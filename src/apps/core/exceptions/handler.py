@@ -23,10 +23,17 @@ from apps.exchange.exceptions.daily_limit_exceptions import DailyLimitExceeded
 from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalance, InsufficientUserBalance, VerifiedBankCardNotFound
 from apps.core.exceptions.celery_exceptions import CeleryDispatchError
 from apps.core.exceptions.inquiry_exceptions import InquiryServiceError, KycInquiryFailed
+from apps.core.exceptions.rate_limit_exceptions import RateLimitExceeded
 from apps.payments.exceptions.payments_exceptions import InvoiceNotFound
 
 
 def custom_exception_handler(exc, context):
+
+    if isinstance(exc, RateLimitExceeded):
+        response = _error_response(exc, status.HTTP_429_TOO_MANY_REQUESTS)
+        if exc.retry_after:
+            response['Retry-After'] = str(exc.retry_after)
+        return response
 
     if isinstance(exc, ActionDisabled):
         return _error_response(exc, status.HTTP_403_FORBIDDEN)

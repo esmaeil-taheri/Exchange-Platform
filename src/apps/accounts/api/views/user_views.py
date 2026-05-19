@@ -13,6 +13,7 @@ from apps.accounts.api.serializers.user_serializers import (
 )
 from apps.core.exceptions.open_api import ErrorSerializer
 from apps.accounts.services.user_services import UserService
+from apps.core.decorators.rate_limit import rate_limit
 
 
 class LoginRegisterApiView(APIView):
@@ -52,6 +53,8 @@ class LoginRegisterApiView(APIView):
         }
     )
 
+    @rate_limit(scope='otp_send_ip',    limit=5, window=600, key='ip')
+    @rate_limit(scope='otp_send_phone', limit=3, window=600, key='phone', phone_field='phone_number')
     def post(self, request, *args, **kwargs):
         serializer = LoginRegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -104,6 +107,7 @@ class LoginRegisterVerifyApiView(APIView):
         }
     )
 
+    @rate_limit(scope='otp_verify_ip', limit=10, window=600, key='ip')
     def post(self, request, *args, **kwargs):
         serializer = LoginRegisterVerifySerializer(
             data=request.data,
@@ -112,7 +116,7 @@ class LoginRegisterVerifyApiView(APIView):
         serializer.is_valid(raise_exception=True)
 
         data = serializer.save()
-        
+
         return Response(
             data, status=status.HTTP_200_OK
         )
@@ -172,6 +176,7 @@ class Verify2FAAccessApiView(APIView):
         }
     )
     
+    @rate_limit(scope='2fa_otp_send', limit=3, window=600, key='user')
     def post(self, request, *args, **kwargs):
         serializer = Verify2faAccessSerializer(data={}, context={'request': request})
         serializer.is_valid(raise_exception=True)

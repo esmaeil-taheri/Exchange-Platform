@@ -135,6 +135,14 @@ CACHES["otp"] = {
     }
 }
 
+CACHES["ratelimit"] = {
+    "BACKEND": "django_redis.cache.RedisCache",
+    "LOCATION": f"redis://:{REDIS_PASS}@{REDIS_HOST}:{REDIS_PORT}/2",
+    "OPTIONS": {
+        "CLIENT_CLASS": "django_redis.client.DefaultClient",
+    }
+}
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

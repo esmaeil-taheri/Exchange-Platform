@@ -9,6 +9,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from apps.customers.api.permissions.customer_permisions import IsCustomerAuthenticated
 from apps.core.exceptions.open_api import ErrorSerializer
+from apps.core.decorators.rate_limit import rate_limit
 from apps.exchange.api.serializers.buy_sell_serializers import BuySerializer, IRTTransactionListSerializer, InvoiceListSerializer, SellSerializer, XAU18TransactionListSerializer
 from apps.exchange.selectors.wallet_selectors import WalletSelector
 from apps.core.pagination import StandardResultsSetPagination
@@ -115,6 +116,7 @@ class BuyApiView(APIView):
         }
     )
 
+    @rate_limit(scope='buy_user', limit=5, window=60, key='user')
     def post(self, request, *args, **kwargs):
         serializer = BuySerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -251,6 +253,7 @@ class SellApiView(APIView):
         }
     )
 
+    @rate_limit(scope='sell_user', limit=5, window=60, key='user')
     def post(self, request, *args, **kwargs):
         serializer = SellSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
