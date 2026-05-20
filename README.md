@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ XAU18 Exchange Platform
+# ⚡ GOLD Exchange Platform
 
 ### Enterprise-Grade Digital Gold Trading System
 
