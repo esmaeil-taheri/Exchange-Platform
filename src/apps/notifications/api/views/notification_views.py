@@ -32,6 +32,8 @@ class GetNotificationsListApiView(ListAPIView):
     
 
 class ReadNotificationApiView(APIView):
+    permission_classes = [IsAuthenticated]
+    
     @extend_schema(
         summary="Mark a notification as read",
         tags=['Notifications'],

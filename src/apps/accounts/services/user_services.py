@@ -80,7 +80,7 @@ class UserService:
             raise FailedToSendOtp("خطا در ارسال رمز یکبار مصرف. لطفا دقایقی دیگر مجددا تلاش کنید.")
 
         logger.info(
-            f"OTP sent successfully | type={otp_type} phone={phone_number[:4]}****{phone_number[-2:]}:{otp}"
+            f"OTP sent successfully | type={otp_type} phone={phone_number[:4]}****{phone_number[-2:]}"
         )
 
         return {
