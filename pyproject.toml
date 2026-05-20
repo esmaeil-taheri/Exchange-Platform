@@ -17,7 +17,7 @@ dependencies = [
 
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "config.settings"
+DJANGO_SETTINGS_MODULE = "config.settings.test"
 pythonpath = ["src"]
 testpaths = ["src/apps"]
 
