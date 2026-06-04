@@ -69,7 +69,7 @@ class PriceService:
 
 
                 # ------------------------------
-                #    Mintenance Fee
+                #    Maintenance Fee
                 # ------------------------------
                 maintenance_fee = (currency.maintenance_fee * gold_amount).quantize(
                     Decimal("1"), rounding=ROUND_HALF_UP

@@ -217,8 +217,8 @@ SIMPLE_JWT = {
 
 # Drf spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Im a NINJA too 🥷',
-    'DESCRIPTION': 'Gold Trading Paltfrom Docs',
+    'TITLE': 'Gold Trading Platform API',
+    'DESCRIPTION': 'Gold Trading Platform Docs',
     'VERSION': '1.0.0',
 
     'COMPONENT_SPLIT_REQUEST': True,

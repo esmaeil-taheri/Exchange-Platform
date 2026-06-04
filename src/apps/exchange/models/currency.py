@@ -5,7 +5,7 @@ class Currency(models.Model):
 
     symbol = models.CharField(max_length=10, verbose_name='Symbol')
     
-    fa_title = models.CharField(max_length=50, verbose_name='Frasi Title')
+    fa_title = models.CharField(max_length=50, verbose_name='Farsi Title')
     en_title = models.CharField(max_length=50, verbose_name='English Title')
 
     logo_url = models.URLField(verbose_name='Logo Url')
