@@ -36,7 +36,7 @@
 
 ## 🌐 Overview
 
-**XAU18 Exchange** is a full-featured fintech backend platform for trading digital gold (XAU18). It enables users to buy and sell gold-backed digital assets using two payment methods — direct wallet balance or live payment gateway — with real-time pricing, KYC verification, multi-wallet management, and automated bank settlement.
+**GOLD Exchange Platform** is a full-featured fintech backend platform for trading digital gold (XAU18). It enables users to buy and sell gold-backed digital assets using two payment methods — direct wallet balance or live payment gateway — with real-time pricing, KYC verification, multi-wallet management, and automated bank settlement.
 
 ### What makes it production-ready:
 
