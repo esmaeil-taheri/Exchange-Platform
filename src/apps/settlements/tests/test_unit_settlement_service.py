@@ -104,3 +104,103 @@ class TestInitiateWithdrawalRequest:
         )
 
         mock_withdrawal_task.assert_called_once()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# process_stuck_withdrawals
+# ═════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.django_db(transaction=True)
+class TestProcessStuckWithdrawals:
+
+    @staticmethod
+    def _make_withdrawal(customer, bank_card, *, status, track_id='', age_minutes=0):
+        """Create a withdrawal and backdate created_at (auto_now_add) via update()."""
+        from datetime import timedelta
+        from django.utils import timezone
+
+        withdrawal = Withdrawal.objects.create(
+            customer=customer,
+            card=bank_card,
+            amount=WITHDRAWAL_AMT,
+            settlement_method='پایا',
+            status=status,
+            track_id=track_id,
+        )
+        if age_minutes:
+            Withdrawal.objects.filter(id=withdrawal.id).update(
+                created_at=timezone.now() - timedelta(minutes=age_minutes)
+            )
+        return withdrawal
+
+    def test_old_pending_withdrawal_is_requeued(self, customer, bank_card, mocker):
+        """A PENDING withdrawal older than the age threshold must be requeued."""
+        from apps.settlements.tasks.settlement_tasks import process_stuck_withdrawals
+
+        delay_mock = mocker.patch(
+            'apps.settlements.tasks.settlement_tasks.process_withdrawal_requests.delay'
+        )
+        withdrawal = self._make_withdrawal(
+            customer, bank_card,
+            status=Withdrawal.WithdrawalStatus.PENDING,
+            age_minutes=10,
+        )
+
+        process_stuck_withdrawals()
+
+        delay_mock.assert_called_once_with(withdrawal.id)
+
+    def test_fresh_pending_withdrawal_is_not_requeued(self, customer, bank_card, mocker):
+        """A PENDING withdrawal younger than the threshold must be left alone."""
+        from apps.settlements.tasks.settlement_tasks import process_stuck_withdrawals
+
+        delay_mock = mocker.patch(
+            'apps.settlements.tasks.settlement_tasks.process_withdrawal_requests.delay'
+        )
+        self._make_withdrawal(
+            customer, bank_card,
+            status=Withdrawal.WithdrawalStatus.PENDING,
+            age_minutes=0,
+        )
+
+        process_stuck_withdrawals()
+
+        delay_mock.assert_not_called()
+
+    def test_pending_with_track_id_is_not_requeued(self, customer, bank_card, mocker):
+        """A withdrawal that already reached the PSP (has track_id) must not be requeued."""
+        from apps.settlements.tasks.settlement_tasks import process_stuck_withdrawals
+
+        delay_mock = mocker.patch(
+            'apps.settlements.tasks.settlement_tasks.process_withdrawal_requests.delay'
+        )
+        self._make_withdrawal(
+            customer, bank_card,
+            status=Withdrawal.WithdrawalStatus.PENDING,
+            track_id='123',
+            age_minutes=10,
+        )
+
+        process_stuck_withdrawals()
+
+        delay_mock.assert_not_called()
+
+    def test_non_pending_statuses_are_not_requeued(self, customer, bank_card, mocker):
+        """SENT_TO_BANK / COMPLETED / FAILED rows must never be requeued."""
+        from apps.settlements.tasks.settlement_tasks import process_stuck_withdrawals
+
+        delay_mock = mocker.patch(
+            'apps.settlements.tasks.settlement_tasks.process_withdrawal_requests.delay'
+        )
+        for status in (
+            Withdrawal.WithdrawalStatus.SENT_TO_BANK,
+            Withdrawal.WithdrawalStatus.COMPLETED,
+            Withdrawal.WithdrawalStatus.FAILED,
+        ):
+            self._make_withdrawal(
+                customer, bank_card, status=status, age_minutes=10,
+            )
+
+        process_stuck_withdrawals()
+
+        delay_mock.assert_not_called()

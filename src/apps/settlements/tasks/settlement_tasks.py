@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
@@ -213,3 +215,45 @@ def inquiry_processed_withdrawals():
                 f"Unexpected error in process_withdrawal_requests for: {pending.id}"
             )
             continue
+
+
+STUCK_WITHDRAWAL_AGE_MINUTES = 5
+STUCK_WITHDRAWAL_BATCH_SIZE = 20
+
+
+@shared_task()
+def process_stuck_withdrawals():
+    """
+    Safety net: requeue PENDING withdrawals whose processing task was lost.
+
+    A withdrawal stays PENDING with an empty track_id if queueing
+    process_withdrawal_requests failed (broker down) or the task was dropped.
+    The user's IRT is already debited at that point, so the row must not be
+    left behind. Requeueing is safe because process_withdrawal_requests is
+    idempotent (it checks both status and track_id before doing anything).
+
+    Only rows older than STUCK_WITHDRAWAL_AGE_MINUTES are picked up, so this
+    never races with the normal apply_async(countdown=10) path.
+    """
+    cutoff = timezone.now() - timedelta(minutes=STUCK_WITHDRAWAL_AGE_MINUTES)
+
+    stuck = list(
+        Withdrawal.objects.filter(
+            status=Withdrawal.WithdrawalStatus.PENDING,
+            track_id='',
+            created_at__lt=cutoff,
+        ).order_by('created_at')[:STUCK_WITHDRAWAL_BATCH_SIZE]
+    )
+
+    if not stuck:
+        return
+
+    logger.warning(
+        f"[task=stuck_withdrawals] Found {len(stuck)} stuck withdrawal(s) — requeuing"
+    )
+
+    for withdrawal in stuck:
+        process_withdrawal_requests.delay(withdrawal.id)
+        logger.info(
+            f"[task=stuck_withdrawals] Requeued withdrawal | withdrawal_id={withdrawal.id}"
+        )
