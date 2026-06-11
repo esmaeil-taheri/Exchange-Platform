@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_spectacular",
     "django_celery_beat",
@@ -207,8 +208,12 @@ REST_FRAMEWORK = {
 
 # JWT
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=config("ACCESS_TOKEN_LIFETIME_MINUTES", default=15, cast=int)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=config("REFRESH_TOKEN_LIFETIME_DAYS", default=30, cast=int)
+    ),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
@@ -280,6 +285,7 @@ ZARINPAL_CALLBACK_URL = config('ZARINPAL_CALLBACK_URL')
 # Settlements
 VANDAR_API_KEY = config('VANDAR_API_KEY')
 VANDAR_BUSINESS_NAME = config('VANDAR_BUSINESS_NAME')
+VANDAR_SETTLEMENT_WAGE = config('VANDAR_SETTLEMENT_WAGE', default=6000, cast=int)
 
 # ─── Logging ────────────────────────────────────────────────────────────────
 from config.logging_config import LOGGING  # noqa: E402

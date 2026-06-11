@@ -3,13 +3,21 @@ from django.conf import settings
 from apps.core.services.payment.base import PaymentGateway
 from apps.core.exceptions.base import PaymentGatewayError
 
+import logging
+
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class ZarinpalGateway(PaymentGateway):
 
     def __init__(self):
         self.merchant_key = settings.ZARINPAL_MERCHANT_KEY
+
+    @staticmethod
+    def _server_name() -> str:
+        return 'sandbox' if settings.DEBUG else 'payment'
 
     def process_payment(self, amount: int, invoice_id: int) -> dict:
         payload = {
@@ -21,68 +29,79 @@ class ZarinpalGateway(PaymentGateway):
             'order_id': str(invoice_id)
         }
 
-        server_name = 'payment'
+        server_name = self._server_name()
 
-        if settings.DEBUG:
-            server_name = 'sandbox'
-
-        try: 
-            # NOTE: For testing purposes, we are skipping the actual API call to Zarinpal and returning a mock response.
-
-            if not settings.DEBUG:
-
-                response = requests.post(
-                    f'https://{server_name}.zarinpal.com/pg/v4/payment/request.json', 
-                    json=payload,
-                    timeout=7
-                )
-            
-                data = response.json()
-
-            data = {'data': {'authority': 'S000000000000000000000000000000xzq52', 'fee': 150000, 'fee_type': 'Merchant', 'code': 100, 'message': 'Success'}, 'errors': []}
-
-            return {
-                "authority": data['data']['authority'], 
-                "payment_link": f"https://{server_name}.zarinpal.com/pg/StartPay/{data['data']['authority']}"
-            }
-        except Exception:
+        try:
+            response = requests.post(
+                f'https://{server_name}.zarinpal.com/pg/v4/payment/request.json',
+                json=payload,
+                timeout=7
+            )
+            data = response.json()
+        except (requests.RequestException, ValueError) as e:
+            logger.error(f"[zarinpal] payment request failed | invoice_id={invoice_id} error={e}")
             raise PaymentGatewayError('خطا در اتصال با درگاه پرداخت')
 
-    def verify_payment(self, authority: str, amount: int) -> dict:
+        data_block = data.get('data') or {}
+        authority = data_block.get('authority') if isinstance(data_block, dict) else None
+
+        if data.get('errors') or not authority:
+            logger.error(
+                f"[zarinpal] payment request rejected | invoice_id={invoice_id} "
+                f"errors={data.get('errors')}"
+            )
+            raise PaymentGatewayError('خطا در اتصال با درگاه پرداخت')
+
+        return {
+            "authority": authority,
+            "payment_link": f"https://{server_name}.zarinpal.com/pg/StartPay/{authority}"
+        }
+
+    def verify_payment(self, authority: str, amount: int):
+        """
+        Verify a payment with Zarinpal.
+
+        Returns:
+            dict: full gateway response when the payment is verified (code 100).
+            101:  payment was already verified before.
+            102:  payment failed, was rejected, or the gateway returned an
+                  unexpected code — caller must treat it as not paid.
+
+        Raises:
+            PaymentGatewayError: on connection failure or unparsable response.
+        """
         payload = {
             'merchant_id': self.merchant_key,
             'authority': authority,
             'amount': amount,
         }
 
-        server_name = 'payment'
-
-        if settings.DEBUG:
-            server_name = 'sandbox'
+        server_name = self._server_name()
 
         try:
-            # NOTE: For testing purposes, we are skipping the actual API call to Zarinpal and returning a mock response.
-
-            if not settings.DEBUG:
-            
-                response = requests.post(
-                    f"https://{server_name}.zarinpal.com/pg/v4/payment/verify.json",
-                    json=payload,
-                    timeout=7
-                )
-
-                data = response.json()
-
-            data = {"data": {"code": 100, "message": "Verified", "card_hash": "1EBE3EBEBE35C7EC0F8D6EE4F2F859107A87822CA179BC9528767EA7B5489B69","card_pan": "621986******3905", "ref_id": 201, "fee_type": "Merchant","fee": 0},"errors": []}
-
-            errors = data.get('errors')
-            if errors:
-                return 102
-            
-            elif data['data']['code'] == 100:
-                return data
-            
-            elif data['data']['code'] == 101:
-                return 101
-        except:
+            response = requests.post(
+                f"https://{server_name}.zarinpal.com/pg/v4/payment/verify.json",
+                json=payload,
+                timeout=7
+            )
+            data = response.json()
+        except (requests.RequestException, ValueError) as e:
+            logger.error(f"[zarinpal] verify request failed | authority={authority} error={e}")
             raise PaymentGatewayError('خطا در اتصال با درگاه پرداخت')
+
+        if data.get('errors'):
+            return 102
+
+        data_block = data.get('data') or {}
+        code = data_block.get('code') if isinstance(data_block, dict) else None
+
+        if code == 100:
+            return data
+
+        if code == 101:
+            return 101
+
+        logger.warning(
+            f"[zarinpal] verify returned unexpected code | authority={authority} code={code}"
+        )
+        return 102
