@@ -4,7 +4,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from apps.customers.models.bank_card import BankCard
-from apps.core.services.inquiry.neginhub import Inquiry_Service
+from apps.core.services.inquiry.neginhub import InquiryService
 
 
 OWNERSHIP_MAX_RETRY = 3
@@ -16,7 +16,7 @@ BATCH_SIZE = 10
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3})
 def check_cards_ownership(self):
 
-    service = Inquiry_Service()
+    service = InquiryService()
 
     cards = (
         BankCard.objects
@@ -81,7 +81,7 @@ def check_cards_ownership(self):
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3})
 def complete_verified_cards_information(self):
 
-    service = Inquiry_Service()
+    service = InquiryService()
 
     cards = (
         BankCard.objects

@@ -4,7 +4,7 @@ from django.utils import timezone
 from apps.customers.models.customer import Customer
 from apps.customers.models.kyc import Kyc
 from apps.customers.models.kyc_document import KycDocument
-from apps.core.services.inquiry.neginhub import Inquiry_Service
+from apps.core.services.inquiry.neginhub import InquiryService
 from apps.accounts.models.user import CustomUser
 from apps.customers.exceptions.customer_exceptions import CustomerAlreadyUploadedDoc, CustomerAlreadyVerified
 from apps.site_setting.selectors.setting_selectors import get_site_settings
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 class KycService:
 
-    inquiry_service = Inquiry_Service()
+    inquiry_service = InquiryService()
 
     @staticmethod
     def get_customer_identity_inquiry(
