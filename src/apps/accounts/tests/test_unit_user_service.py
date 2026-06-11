@@ -179,9 +179,15 @@ class TestSendTwoFactorOtp:
         with pytest.raises(OtpAlreadySent):
             UserService.send_two_factor_otp(phone_number=EXISTING_PHONE)
 
-    def test_success_stores_in_cache(self, mock_otp_cache):
+    def test_success_stores_in_cache(self, mock_otp_cache, mock_sms_success):
         UserService.send_two_factor_otp(phone_number=EXISTING_PHONE)
         assert mock_otp_cache.get(f'2fa:{EXISTING_PHONE}') is not None
+        mock_sms_success.assert_called_once()
+
+    def test_provider_failure_clears_cache_and_raises(self, mock_otp_cache, mock_sms_fail):
+        with pytest.raises(FailedToSendOtp):
+            UserService.send_two_factor_otp(phone_number=EXISTING_PHONE)
+        assert mock_otp_cache.get(f'2fa:{EXISTING_PHONE}') is None
 
 
 # ═════════════════════════════════════════════════════════════════════════════

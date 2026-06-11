@@ -97,7 +97,7 @@ class TestTwoFaStatusPersistence:
 @pytest.mark.django_db
 class TestSendTwoFactorOtpIntegration:
 
-    def test_2fa_otp_stored_in_real_cache(self):
+    def test_2fa_otp_stored_in_real_cache(self, mock_sms_success):
         """send_two_factor_otp must write a 6-digit OTP to the real cache."""
         UserService.send_two_factor_otp(phone_number=EXISTING_PHONE)
         otp = caches['otp'].get(f'2fa:{EXISTING_PHONE}')

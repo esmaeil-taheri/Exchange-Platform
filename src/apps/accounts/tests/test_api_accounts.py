@@ -186,7 +186,7 @@ class TestVerify2FAAccessApi:
         response = api_client.post(self.URL, {})
         assert response.status_code == 401
 
-    def test_authenticated_returns_200(self, auth_client, mock_rate_limit):
+    def test_authenticated_returns_200(self, auth_client, mock_rate_limit, mock_sms_success):
         response = auth_client.post(self.URL, {})
         assert response.status_code == 200
 
