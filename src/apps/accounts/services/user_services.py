@@ -159,6 +159,16 @@ class UserService:
         otp = "".join(secrets.choice(string.digits) for _ in range(6))
         otp_cache.set(cache_key, otp, timeout=120)
 
+        provider_response = UserService.otp_provider.send_otp(otp, phone_number)
+
+        if provider_response["code"] != 100:
+            otp_cache.delete(cache_key)
+            logger.error(
+                f"2FA OTP — SMS provider failed | phone={phone_number[:4]}****{phone_number[-2:]} "
+                f"provider_code={provider_response.get('code')}"
+            )
+            raise FailedToSendOtp("خطا در ارسال رمز یکبار مصرف. لطفا دقایقی دیگر مجددا تلاش کنید.")
+
         logger.info(
             f"2FA OTP sent | phone={phone_number[:4]}****{phone_number[-2:]}"
         )

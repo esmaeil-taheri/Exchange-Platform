@@ -28,22 +28,27 @@ class SmsIrProvider(BaseSmsProvider):
             "X-API-KEY": self._api_key,
         }
 
-        response = requests.post(
-            self._url,
-            json=body,
-            headers=headers,
-            timeout=10
-        )
-        
-        result = response.json()
+        try:
+            response = requests.post(
+                self._url,
+                json=body,
+                headers=headers,
+                timeout=10
+            )
+        except requests.RequestException as e:
+            return {
+                "code": 101,
+                "message": f"provider connection error: {e}"
+            }
 
         if response.status_code != 200:
             return {
                 "code": 101,
-                "message": response["message"]
+                "message": response.text
             }
 
-        
+        result = response.json()
+
         if result["status"] == 1:
             return {
                 "code": 100,
@@ -52,9 +57,9 @@ class SmsIrProvider(BaseSmsProvider):
         else:
             return {
                 "code": 102,
-                "message": response["message"]
+                "message": result.get("message", "unknown provider error")
             }
-    
+
     def send_message(self, message: str, phone_number: str):
 
         payload = {
@@ -71,22 +76,27 @@ class SmsIrProvider(BaseSmsProvider):
             "x-api-key": self._api_key,
         }
 
-        response = requests.post(
-            self._url,
-            json=payload,
-            headers=headers,
-            timeout=10
-        )
-        
-        result = response.json()
+        try:
+            response = requests.post(
+                self._url,
+                json=payload,
+                headers=headers,
+                timeout=10
+            )
+        except requests.RequestException as e:
+            return {
+                "code": 101,
+                "message": f"provider connection error: {e}"
+            }
 
         if response.status_code != 200:
             return {
                 "code": 101,
-                "message": response["message"]
+                "message": response.text
             }
 
-        
+        result = response.json()
+
         if result["status"] == 1:
             return {
                 "code": 100,
@@ -95,6 +105,5 @@ class SmsIrProvider(BaseSmsProvider):
         else:
             return {
                 "code": 102,
-                "message": response["message"]
+                "message": result.get("message", "unknown provider error")
             }
-    
