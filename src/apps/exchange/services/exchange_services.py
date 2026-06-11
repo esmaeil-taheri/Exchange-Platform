@@ -28,6 +28,39 @@ logger = get_logger(__name__)
 class ExchangeService:
 
     @staticmethod
+    def _lock_customer_and_validate(*, user_id: int, currency, daily_amount, side: str, asset: str):
+        """
+        Lock the customer row and run the per-customer trade guards.
+
+        Must be called inside transaction.atomic(). The row lock serializes all
+        financial operations of a single customer, so the pending-transaction
+        and daily-limit checks below cannot be bypassed by a concurrent request
+        (TOCTOU). Lock ordering rule: the Customer lock is always taken first,
+        before any wallet/balance locks, to keep lock acquisition deadlock-free.
+
+        Returns the locked Customer instance.
+        """
+        customer = Customer.objects.select_for_update().get(user_id=user_id)
+
+        if customer.status == 'suspended':
+            logger.warning(
+                f"{side.capitalize()} blocked — account suspended | user_id={user_id} asset={asset}"
+            )
+            raise CustomerSuspended('حساب کاربری شما مسدود شده است و امکان انجام تراکنش وجود ندارد')
+
+        pending_transaction = TransactionSelector.get_pending_transaction(
+            customer=customer, currency=currency)
+        if pending_transaction:
+            logger.warning(
+                f"{side.capitalize()} blocked — pending transaction exists | user_id={user_id} asset={asset}"
+            )
+            raise ActionDisabled('شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید.')
+
+        DailyLimitService.check_daily_limit(customer, daily_amount, side)
+
+        return customer
+
+    @staticmethod
     def buy_asset(request, asset: str, amount: int, buy_from_wallet: bool) -> dict:
         """
         Handles user-initiated gold purchase requests and creates a pending buy transaction.
@@ -105,25 +138,6 @@ class ExchangeService:
             transaction_type='buy'
         )
 
-        customer = Customer.objects.get(user_id=user_id)
-
-        if customer.status == 'suspended':
-            logger.warning(
-                f"Buy blocked — account suspended | user_id={user_id} asset={asset}"
-            )
-            raise CustomerSuspended('حساب کاربری شما مسدود شده است و امکان انجام تراکنش وجود ندارد')
-
-        pending_transaction = TransactionSelector.get_pending_transaction(
-            customer=customer, currency=currency)
-        if pending_transaction:
-            logger.warning(
-                f"Buy blocked — pending transaction exists | user_id={user_id} asset={asset}"
-            )
-            raise ActionDisabled(
-                'شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید.')
-
-        DailyLimitService.check_daily_limit(customer, amount, 'buy')
-
         if buy_from_wallet:
 
             if not currency.buy_from_wallet:
@@ -134,6 +148,14 @@ class ExchangeService:
             timestamp = get_date_time()['timestamp']
 
             with transaction.atomic():
+
+                customer = ExchangeService._lock_customer_and_validate(
+                    user_id=user_id,
+                    currency=currency,
+                    daily_amount=amount,
+                    side='buy',
+                    asset=asset,
+                )
 
                 available_balance = CurrencyBalanceService.calculate_available_balance_for_update(
                     symbol=asset)
@@ -199,7 +221,17 @@ class ExchangeService:
             total_amount = int(calculated_price['data']['total_amount'])
             unit_price = int(calculated_price['data']['price_per_gram'])
 
+            # The external gateway call below must stay OUTSIDE this atomic
+            # block: holding the customer lock during a slow HTTP call would
+            # block every other financial operation of this customer.
             with transaction.atomic():
+                customer = ExchangeService._lock_customer_and_validate(
+                    user_id=user_id,
+                    currency=currency,
+                    daily_amount=amount,
+                    side='buy',
+                    asset=asset,
+                )
                 invoice = PaymentService.create_invoice(
                     customer=customer,
                     total_price=total_amount,
@@ -310,30 +342,19 @@ class ExchangeService:
             transaction_type='sell'
         )
 
-        customer = Customer.objects.get(user_id=user_id)
-
-        if customer.status == 'suspended':
-            logger.warning(
-                f"Sell blocked — account suspended | user_id={user_id} asset={asset}"
-            )
-            raise CustomerSuspended('حساب کاربری شما مسدود شده است و امکان انجام تراکنش وجود ندارد')
-
-        pending_transaction = TransactionSelector.get_pending_transaction(
-            customer=customer, currency=currency)
-        if pending_transaction:
-            logger.warning(
-                f"Sell blocked — pending transaction exists | user_id={user_id} asset={asset}"
-            )
-            raise ActionDisabled('شما یک درخواست در حال انتظار دارید. لطفا تا تکمیل آن صبر کنید')
-
-        DailyLimitService.check_daily_limit(
-            customer, calculated_price['data']['total_amount'], 'sell')
-
         withdraw_method = 'wallet'
         customer_ip = get_client_ip(request)
         timestamp = get_date_time()['timestamp']
 
         with transaction.atomic():
+
+            customer = ExchangeService._lock_customer_and_validate(
+                user_id=user_id,
+                currency=currency,
+                daily_amount=calculated_price['data']['total_amount'],
+                side='sell',
+                asset=asset,
+            )
 
             user_wallet_balance = WalletSelector.get_user_balance_for_update(
                 user_id=user_id, wallet_type='xau'

@@ -33,15 +33,19 @@ class SettlementService:
             f"Withdrawal request initiated | user_id={user_id} amount={amount}IRT card_id={card_id}"
         )
 
-        customer = Customer.objects.get(user_id=user_id)
-        card = BankCardSelectors.get_customer_card_by_id(
-            card_id=card_id, customer_id=customer.id
-        )
-
         customer_ip = get_client_ip(request)
         timestamp = get_date_time()['timestamp']
 
         with transaction.atomic():
+            # Customer row lock first (same ordering as ExchangeService) so a
+            # concurrent buy/sell/withdrawal of this customer cannot interleave
+            # between the balance check and the wallet debit below.
+            customer = Customer.objects.select_for_update().get(user_id=user_id)
+
+            card = BankCardSelectors.get_customer_card_by_id(
+                card_id=card_id, customer_id=customer.id
+            )
+
             user_wallet_balance = WalletSelector.get_user_balance_for_update(
                 user_id=user_id, wallet_type='irt'
             )
