@@ -1,0 +1,125 @@
+name: CD
+
+# Release flow:
+#   git tag v1.2.3 && git push origin v1.2.3   → build, push, deploy
+#   (or run manually from the Actions tab via workflow_dispatch)
+#
+# Required repository secrets:
+#   DEPLOY_HOST       server IP/hostname
+#   DEPLOY_USER       ssh user
+#   DEPLOY_SSH_KEY    private key (PEM) for that user
+#   DEPLOY_PATH       directory on the server containing docker-compose.prod.yml + .env
+#   GHCR_PULL_TOKEN   classic PAT with read:packages (lets the server pull the image)
+#
+# Recommended: in repo Settings → Environments → production, add yourself as a
+# Required reviewer — deploys will then wait for one-click manual approval.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    name: Build & push image (GHCR)
+    runs-on: ubuntu-latest
+    outputs:
+      image-ref: ${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # ghcr requires a lowercase image name; the repo name is not lowercase.
+      - name: Compute image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to production
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            export BACKEND_IMAGE="${{ needs.build-and-push.outputs.image-ref }}"
+            echo "Deploying image: $BACKEND_IMAGE"
+
+            echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io \
+              -u "${{ github.actor }}" --password-stdin
+
+            docker compose -f docker-compose.prod.yml pull backend
+
+            # One-off containers (same image, same env) for release steps
+            docker compose -f docker-compose.prod.yml run --rm backend \
+              python manage.py migrate --noinput
+            docker compose -f docker-compose.prod.yml run --rm backend \
+              python manage.py collectstatic --noinput
+
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f
+
+            # Health gate — fail the deploy if the backend doesn't come up
+            healthy=0
+            for i in $(seq 1 12); do
+              if docker compose -f docker-compose.prod.yml exec -T backend \
+                   curl -fsS http://127.0.0.1:8000/metrics > /dev/null 2>&1; then
+                healthy=1
+                break
+              fi
+              echo "Waiting for backend... ($i/12)"
+              sleep 5
+            done
+
+            if [ "$healthy" -ne 1 ]; then
+              echo "::error::Health check FAILED — backend did not come up"
+              docker compose -f docker-compose.prod.yml logs --tail 100 backend
+              exit 1
+            fi
+
+            echo "Deploy OK — $BACKEND_IMAGE is live"

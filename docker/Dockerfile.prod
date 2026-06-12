@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /install
 
 # Copy requirements and install into /install
-COPY prod.requirements.txt .
+COPY requirements.txt prod.requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --prefix=/install -r prod.requirements.txt
 
@@ -27,10 +27,13 @@ FROM python:3.12-slim-bookworm AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app/src \
+    DJANGO_SETTINGS_MODULE=config.settings.prod
 
+# libpq5 for psycopg2, curl for container health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user
@@ -45,16 +48,18 @@ COPY --from=builder /install /usr/local
 # Copy app code
 COPY --chown=appuser:appgroup . .
 
-# Create data dir with correct ownership
-RUN mkdir -p /app/users-data && \
+# Static root (collectstatic target) and data dir with correct ownership
+RUN mkdir -p /app/src/staticfiles /app/users-data && \
     chown -R appuser:appgroup /app
 
 USER appuser
 
 EXPOSE 8000
 
-CMD ["gunicorn", "src.main:app", \
-     "-k", "uvicorn.workers.UvicornWorker", \
+CMD ["gunicorn", "config.wsgi:application", \
+     "--chdir", "src", \
      "--bind", "0.0.0.0:8000", \
      "--workers", "4", \
-     "--log-level", "info"]
+     "--timeout", "120", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]
