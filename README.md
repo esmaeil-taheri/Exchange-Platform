@@ -735,4 +735,13 @@ Currency
 
 Built with precision for financial reliability. Every Toman accounted for.
 
+## 📄 License
+
+Copyright © 2026 Esmaeil Taheri.
+
+All rights reserved.
+
+This source code is publicly available for viewing and reference purposes only.
+No permission is granted to copy, modify, distribute, or use this code without prior written permission.
+
 </div>
