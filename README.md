@@ -36,7 +36,7 @@
 
 ## 🌐 Overview
 
-**Exchange Platform** is a full-featured fintech backend platform for trading digital assets (XAU18). It enables users to buy and sell digital assets using two payment methods — direct wallet balance or live payment gateway — with real-time pricing, KYC verification, multi-wallet management, and automated bank settlement.
+**Exchange Platform** is a full-featured fintech backend platform for trading digital assets. It enables users to buy and sell digital assets using two payment methods — direct wallet balance or live payment gateway — with real-time pricing, KYC verification, multi-wallet management, and automated bank settlement.
 
 ### What makes it production-ready:
 
