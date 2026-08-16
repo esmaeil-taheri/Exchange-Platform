@@ -1,8 +1,8 @@
 <div align="center">
 
-# ⚡ GOLD Exchange Platform
+# ⚡ Exchange Platform
 
-### Enterprise-Grade Digital Gold Trading System
+### Enterprise-Grade Digital Asset Trading System
 
 [![Django](https://img.shields.io/badge/Django-5.2.11-092E20?style=for-the-badge&logo=django&logoColor=white)](https://www.djangoproject.com/)
 [![DRF](https://img.shields.io/badge/DRF-3.16.1-red?style=for-the-badge&logo=django&logoColor=white)](https://www.django-rest-framework.org/)
@@ -11,7 +11,7 @@
 [![Celery](https://img.shields.io/badge/Celery-5.6.3-37814A?style=for-the-badge&logo=celery&logoColor=white)](https://docs.celeryq.dev/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-*A production-ready, modular backend for buying, selling, and settling digital gold assets — built with clean architecture principles and financial-grade reliability.*
+*A production-ready, modular backend for buying, selling, and settling digital assets — built with clean architecture principles and financial-grade reliability.*
 
 </div>
 
@@ -36,7 +36,7 @@
 
 ## 🌐 Overview
 
-**GOLD Exchange Platform** is a full-featured fintech backend platform for trading digital gold (XAU18). It enables users to buy and sell gold-backed digital assets using two payment methods — direct wallet balance or live payment gateway — with real-time pricing, KYC verification, multi-wallet management, and automated bank settlement.
+**Exchange Platform** is a full-featured fintech backend platform for trading digital assets (XAU18). It enables users to buy and sell digital assets using two payment methods — direct wallet balance or live payment gateway — with real-time pricing, KYC verification, multi-wallet management, and automated bank settlement.
 
 ### What makes it production-ready:
 
@@ -57,30 +57,30 @@ The system follows **Domain-Driven Design (DDD)** with a strict **4-layer archit
 └──────────────────────────────┬───────────────────────────────┘
                                │ HTTPS
 ┌──────────────────────────────▼───────────────────────────────┐
-│                    Nginx  (Reverse Proxy)                     │
+│                    Nginx  (Reverse Proxy)                    │
 └──────────────────────────────┬───────────────────────────────┘
                                │
 ┌──────────────────────────────▼───────────────────────────────┐
-│                   Django REST Framework                       │
+│                   Django REST Framework                      │
 │  ┌─────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
-│  │    Views    │  │ Serializers  │  │    Permissions       │ │
+│  │    Views    │  │ Serializers  │  │     Permissions      │ │
 │  └──────┬──────┘  └──────┬───────┘  └──────────────────────┘ │
-│         └────────────────▼                                    │
-│  ┌────────────────────────────────────────────────────────┐   │
-│  │              Service Layer  (Business Logic)           │   │
-│  └────────────────────────┬───────────────────────────────┘   │
-│                           │                                   │
-│  ┌────────────────────────▼───────────────────────────────┐   │
-│  │              Selector Layer  (Read Queries)            │   │
-│  └────────────────────────┬───────────────────────────────┘   │
-│                           │                                   │
-│  ┌────────────────────────▼───────────────────────────────┐   │
-│  │                  Models  (PostgreSQL)                  │   │
-│  └────────────────────────────────────────────────────────┘   │
+│         └────────────────▼                                   │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │              Service Layer  (Business Logic)           │  │
+│  └────────────────────────┬───────────────────────────────┘  │
+│                           │                                  │
+│  ┌────────────────────────▼───────────────────────────────┐  │
+│  │              Selector Layer  (Read Queries)            │  │
+│  └────────────────────────┬───────────────────────────────┘  │
+│                           │                                  │
+│  ┌────────────────────────▼───────────────────────────────┐  │
+│  │                  Models  (PostgreSQL)                  │  │
+│  └────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
                                │
           ┌────────────────────┼────────────────────┐
-          │                   │                    │
+          │                    │                    │
 ┌─────────▼──────┐  ┌─────────▼──────┐  ┌─────────▼──────┐
 │  Celery Worker │  │  Celery  Beat  │  │     Redis      │
 │ (Async Tasks)  │  │  (Scheduler)   │  │ (Cache + OTP)  │
@@ -200,7 +200,7 @@ Django modular/
         │   │   ├── currency.py         # Asset definition + fee config
         │   │   ├── wallet.py           # User balance entries
         │   │   ├── transaction.py      # Buy/sell record
-        │   │   ├── currency_balance.py # System gold inventory
+        │   │   ├── currency_balance.py # System asset inventory
         │   │   ├── price_log.py        # Historical price log
         │   │   └── daily_limit.py      # Singleton daily limit config
         │   ├── api/
@@ -218,7 +218,7 @@ Django modular/
         │   ├── selectors/
         │   └── tasks/
         │       ├── exchange_tasks.py   # Post-buy / post-sell async processing
-        │       └── price_tasks.py      # Gold price feed polling
+        │       └── price_tasks.py      # Asset price feed polling
         │
         ├── payments/               # 💳 Payment gateway (Zarinpal)
         │   ├── models/             # Invoice
@@ -268,7 +268,7 @@ Django modular/
 
 | Model | Key Fields |
 |-------|-----------|
-| `Customer` | `status`, `level` (bronze/silver/gold), `referral_code` |
+| `Customer` | `status`, `level` (bronze/silver/platinum), `referral_code` |
 | `BankCard` | `card_number`, `shaba_number`, `is_verified`, `ownership_counter` |
 | `Kyc` | Status machine: `NOT_STARTED → SHAHKAR_VERIFIED → PENDING_UPLOAD → PENDING_REVIEW → APPROVED` |
 | `KycDocument` | `image_url` (MinIO), `verified` |
@@ -308,7 +308,7 @@ Currency
 
 **Dynamic Fee Calculation (PriceService):**
 
-| Gold Amount | Fee Applied |
+| Asset Amount | Fee Applied |
 |-------------|-------------|
 | `< 0.5g` | Fixed fee (`fixed_buy_fee_toman`) |
 | `0.5g – 1g` | Linear interpolation between fixed and percentage |
@@ -322,7 +322,7 @@ Plus per-gram maintenance fee on top.
 - Current balance = sum of all verified wallet entries per `wallet_type`
 
 **System Inventory** tracked in `CurrencyBalance`:
-- `active_balance` — available gold to sell
+- `active_balance` — available assets to sell
 - `locked_balance` — reserved pending transactions
 - All mutations use `select_for_update()` to prevent overselling
 
@@ -469,8 +469,8 @@ Base URL: `/api/v1/`
 |--------|----------|-------------|
 | `GET` | `/exchange/buy-sell-price/` | Real-time buy & sell prices |
 | `POST` | `/exchange/price-calculator/` | Calculate price for a given amount |
-| `POST` | `/exchange/buy/` | Buy gold asset |
-| `POST` | `/exchange/sell/` | Sell gold asset |
+| `POST` | `/exchange/buy/` | Buy digital asset |
+| `POST` | `/exchange/sell/` | Sell digital asset |
 | `GET` | `/exchange/balance/` | User wallets (IRT + XAU18) |
 | `GET` | `/exchange/transactions/` | Transaction history (paginated) |
 | `GET` | `/exchange/invoice-list/` | Invoice list |
@@ -513,9 +513,9 @@ Base URL: `/api/v1/`
 ### Authentication Layers
 
 ```
-Layer 1: SMS OTP    — 6-digit code, 120s TTL, Redis-backed
-Layer 2: JWT        — 30-day access token, 7-day refresh, rotation enabled
-Layer 3: TOTP 2FA   — Optional Google Authenticator integration
+Layer 1: SMS OTP     — 6-digit code, 120s TTL, Redis-backed
+Layer 2: JWT         — 1-day access token, 7-day refresh, rotation enabled
+Layer 3: TOTP 2FA    — Optional Google Authenticator integration
 Layer 4: IP Tracking — Every transaction records client IP
 ```
 
@@ -532,7 +532,7 @@ Layer 4: IP Tracking — Every transaction records client IP
 | `transaction.atomic()` | All-or-nothing financial mutations |
 | Idempotency flags (`is_processed`) | Safe Celery task retries |
 | Daily transaction limits | System-wide buy/sell caps |
-| Inventory locking (`CurrencyBalance`) | Prevents overselling gold |
+| Inventory locking (`CurrencyBalance`) | Prevents overselling assets |
 
 ---
 
@@ -648,7 +648,7 @@ REDIS_PASS=your-redis-password
 # ─── JWT ───────────────────────────────────────────
 JWT_SECRET_KEY=your-jwt-secret
 JWT_ALGORITHM=HS256
-ACCESS_TOKEN_LIFETIME_DAYS=30
+ACCESS_TOKEN_LIFETIME_DAYS=1
 REFRESH_TOKEN_LIFETIME_DAYS=7
 
 # ─── Object Storage (MinIO) ────────────────────────
@@ -694,7 +694,7 @@ All async operations run through Celery. The Beat scheduler manages periodic tas
 | `inquiry_processed_withdrawals` | Periodic (Beat) | Poll Vandar for settlement status |
 | `check_cards_ownership` | Periodic (Beat) | Batch bank card ownership verification |
 | `complete_verified_cards_information` | Periodic (Beat) | Enrich verified card data |
-| `fetch_gold_price` | Periodic (Beat) | Pull latest XAU18 price from feed |
+| `fetch_asset_price` | Periodic (Beat) | Pull latest XAU18 price from feed |
 
 ### Monitor Tasks Live
 
@@ -724,7 +724,7 @@ CustomUser
                  └─── M:N ──▶ TrustedIp
 
 Currency
-  ├─── 1:1 ──▶ CurrencyBalance   (system gold inventory)
+  ├─── 1:1 ──▶ CurrencyBalance   (system asset inventory)
   ├─── 1:N ──▶ CurrencyPriceLog  (historical price feed)
   └─── 1:N ──▶ Transaction       (all trades referencing this asset)
 ```
@@ -734,14 +734,5 @@ Currency
 <div align="center">
 
 Built with precision for financial reliability. Every Toman accounted for.
-
-## 📄 License
-
-Copyright © 2026 Esmaeil Taheri.
-
-All rights reserved.
-
-This source code is publicly available for viewing and reference purposes only.
-No permission is granted to copy, modify, distribute, or use this code without prior written permission.
 
 </div>
