@@ -49,7 +49,7 @@
 
 ## 🏗 Architecture
 
-The system follows **Domain-Driven Design (DDD)** with a strict **4-layer architecture** per application:
+The system follows a **strict 4-layer architecture** per application:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
