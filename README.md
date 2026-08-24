@@ -29,6 +29,8 @@
 - [Security](#-security)
 - [Infrastructure & DevOps](#-infrastructure--devops)
 - [Getting Started](#-getting-started)
+- [Dependency Management (uv)](#-dependency-management-uv)
+- [Tests & Coverage](#-tests--coverage)
 - [Environment Variables](#-environment-variables)
 - [Background Tasks](#-background-tasks)
 
@@ -156,8 +158,10 @@ Django modular/
 │   ├── Dockerfile.dev              # Development image
 │   └── Dockerfile.prod             # Production image
 ├── nginx.conf                      # Reverse proxy config
-├── pyproject.toml                  # Project metadata + pytest config
-├── requirements.txt                # Python dependencies
+├── pyproject.toml                  # Dependencies (uv) + pytest/coverage config
+├── uv.lock                         # Fully resolved dependency tree — committed
+├── requirements.txt                # Generated from uv.lock (app + dev)
+├── prod.requirements.txt           # Generated from uv.lock (app only)
 │
 └── src/
     ├── config/                     # Project-level configuration
@@ -571,8 +575,11 @@ Layer 4: IP Tracking — Every transaction records client IP
 ### Prerequisites
 
 - Docker & Docker Compose
-- Python 3.12+ (for local development without Docker)
+- [uv](https://docs.astral.sh/uv/) 0.8+ (for local development without Docker)
 - Git
+
+uv manages both the Python toolchain and the dependencies — you do not need to
+install Python 3.12 or create a virtualenv yourself.
 
 ### 1. Clone the Repository
 
@@ -620,6 +627,114 @@ docker-compose exec backend python manage.py collectstatic --noinput
 | `http://localhost:8000/admin/` | Django Admin |
 | `http://localhost:5520/` | Celery Flower Monitor |
 | `http://localhost:80/` | Nginx (Production proxy) |
+
+---
+
+## 📦 Dependency Management (uv)
+
+`pyproject.toml` is the source of truth and `uv.lock` pins the entire
+transitive tree. Both are committed; `.venv/` is not.
+
+### Everyday commands
+
+```bash
+uv sync                    # create/update .venv to match uv.lock (includes dev group)
+uv sync --no-dev           # runtime dependencies only — what the prod image installs
+uv run pytest              # run the test suite
+uv run python manage.py migrate
+uv run ruff check src
+```
+
+`uv run` resolves the environment before each command, so there is no
+virtualenv to activate.
+
+### Dependency groups
+
+| Group | Contents | Installed in |
+|-------|----------|--------------|
+| *(main)* | Django, DRF, Celery, psycopg2, gunicorn … | dev + production images |
+| `dev` | pytest, pytest-django, pytest-mock, pytest-cov, ruff, flower | dev image and CI only |
+
+The production image is built with `uv sync --locked --no-dev`, so test tooling
+never ships to production.
+
+### Changing dependencies
+
+```bash
+uv add <package>           # runtime dependency
+uv add --dev <package>     # dev-only dependency
+uv remove <package>
+```
+
+Each command updates `pyproject.toml` and `uv.lock` together. After any change,
+regenerate the two exported requirement files and commit them alongside the lock:
+
+```bash
+uv export --frozen --no-hashes --no-emit-project -o requirements.txt
+uv export --frozen --no-hashes --no-emit-project --no-dev -o prod.requirements.txt
+```
+
+These exports exist only for tooling that still expects pip — nothing in this
+repository installs from them. The `requirements-drift` CI job fails if they
+fall behind `uv.lock`, and the `uv-lock` pre-commit hook keeps the lock itself
+in sync with `pyproject.toml`.
+
+### Building behind a restricted network
+
+Both Dockerfiles accept an index override:
+
+```bash
+docker build -f docker/Dockerfile.prod \
+  --build-arg UV_DEFAULT_INDEX=https://mirror-pypi.runflare.com/simple .
+```
+
+`Dockerfile.dev` already defaults to that mirror; `Dockerfile.prod` defaults to
+`pypi.org`.
+
+---
+
+## 🧪 Tests & Coverage
+
+```bash
+uv run pytest                                   # full suite
+uv run pytest --cov=src --cov-report=term-missing   # with coverage
+uv run pytest src/apps/exchange -q              # one app
+```
+
+Configuration lives in `pyproject.toml` (`[tool.pytest.ini_options]` and
+`[tool.coverage.*]`). Tests run against SQLite with migrations disabled, so the
+suite needs no database container.
+
+### Current status
+
+| Metric | Value |
+|--------|-------|
+| Tests | **194 passed**, 1 skipped |
+| Overall coverage | **70%** (3,491 statements, 436 branches) |
+| Runtime | ~15s |
+
+The skipped test is `TestRealRowLocks`, which needs real `SELECT ... FOR UPDATE`
+blocking — SQLite ignores row locks, so it only runs against PostgreSQL.
+
+### Coverage is uneven — read this before trusting the 70%
+
+Coverage is concentrated in the API layer. The background workers that actually
+move money and gold are close to untested:
+
+| Module | Coverage |
+|--------|----------|
+| `payments/services/payments_services.py` | 94% |
+| `exchange/api/views/buy_sell_views.py` | 97% |
+| `settlements/services/settlement_services.py` | 93% |
+| `exchange/services/exchange_services.py` | 79% |
+| `exchange/services/price_services.py` | 52% |
+| `exchange/services/daily_limit_services.py` | 28% |
+| `settlements/tasks/settlement_tasks.py` | 22% |
+| `payments/tasks/payment_tasks.py` | 21% |
+| `exchange/tasks/price_tasks.py` | 20% |
+| **`exchange/tasks/exchange_tasks.py`** | **9%** |
+| `customers/tasks/bank_card_tasks.py` | 0% |
+
 
 ---
 
