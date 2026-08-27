@@ -10,6 +10,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExam
 from apps.settlements.models.withdrawal import Withdrawal
 from apps.settlements.selectors.withdrawal_selectors import WithdrawalSelectors
 from apps.settlements.api.serializers.withdrawal_serializers import WithdrawSerializer, WithdrawalBaseMessageSerializer, WithdrawalDetailSerializer, WithdrawalSerializer
+from apps.customers.api.permissions.customer_permisions import IsCustomerAuthenticated
 from apps.core.pagination import StandardResultsSetPagination
 from apps.core.exceptions.open_api import ErrorSerializer
 from apps.core.decorators.rate_limit import rate_limit
@@ -146,7 +147,10 @@ class WithdrawalDetailApiView(RetrieveAPIView):
 
 class CreateWithdrawalRequest(APIView):
 
-    permission_classes = [IsAuthenticated]
+    # Same guard as BuyApiView / SellApiView: money leaving the platform must be
+    # at least as protected as money moving inside it. IsCustomerAuthenticated
+    # rejects both suspended and not-yet-verified (preregister) customers.
+    permission_classes = [IsAuthenticated, IsCustomerAuthenticated]
 
     @extend_schema(
         summary="Create withdrawal request",

@@ -3,6 +3,7 @@ from django.db import transaction
 from apps.settlements.models.withdrawal import Withdrawal
 from apps.exchange.selectors.wallet_selectors import WalletSelector
 from apps.customers.models.customer import Customer
+from apps.customers.exceptions.customer_exceptions import CustomerSuspended
 from apps.customers.selectors.bank_card_selectors import BankCardSelectors
 from apps.exchange.exceptions.exchange_exceptions import InsufficientUserBalance
 from apps.exchange.services.wallet_service import WalletService
@@ -41,6 +42,18 @@ class SettlementService:
             # concurrent buy/sell/withdrawal of this customer cannot interleave
             # between the balance check and the wallet debit below.
             customer = Customer.objects.select_for_update().get(user_id=user_id)
+
+            # Checked inside the lock, not just at the permission layer: an admin
+            # suspending the account mid-request must not be able to interleave
+            # between the permission check and the wallet debit below.
+            if customer.status == 'suspended':
+                logger.warning(
+                    f"Withdrawal blocked — account suspended | user_id={user_id} "
+                    f"amount={amount}IRT card_id={card_id}"
+                )
+                raise CustomerSuspended(
+                    'حساب کاربری شما مسدود شده است و امکان انجام تراکنش وجود ندارد'
+                )
 
             card = BankCardSelectors.get_customer_card_by_id(
                 card_id=card_id, customer_id=customer.id

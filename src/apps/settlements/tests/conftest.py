@@ -34,8 +34,24 @@ def user(db):
 
 @pytest.fixture
 def customer(user):
-    """Customer auto-created by the post_save signal."""
+    """Customer auto-created by the post_save signal (status='preregister')."""
     return user.customer_profile
+
+
+@pytest.fixture
+def authenticated_customer(customer):
+    """Customer with status='authenticated' — required by IsCustomerAuthenticated."""
+    customer.status = 'authenticated'
+    customer.save(update_fields=['status'])
+    return customer
+
+
+@pytest.fixture
+def suspended_customer(customer):
+    """Customer blocked by the risk team — must not be able to move money out."""
+    customer.status = 'suspended'
+    customer.save(update_fields=['status'])
+    return customer
 
 
 @pytest.fixture
@@ -85,6 +101,24 @@ def api_client():
 @pytest.fixture
 def auth_client(user):
     """APIClient with a valid JWT for the test user."""
+    client = APIClient()
+    refresh = RefreshToken.for_user(user)
+    client.credentials(HTTP_AUTHORIZATION=f'Bearer {str(refresh.access_token)}')
+    return client
+
+
+@pytest.fixture
+def auth_client_authenticated(user, authenticated_customer):
+    """Authenticated client whose customer has status='authenticated'."""
+    client = APIClient()
+    refresh = RefreshToken.for_user(user)
+    client.credentials(HTTP_AUTHORIZATION=f'Bearer {str(refresh.access_token)}')
+    return client
+
+
+@pytest.fixture
+def auth_client_suspended(user, suspended_customer):
+    """Authenticated client whose customer has status='suspended'."""
     client = APIClient()
     refresh = RefreshToken.for_user(user)
     client.credentials(HTTP_AUTHORIZATION=f'Bearer {str(refresh.access_token)}')

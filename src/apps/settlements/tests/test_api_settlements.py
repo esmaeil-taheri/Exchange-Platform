@@ -99,39 +99,65 @@ class TestCreateWithdrawalApi:
         )
         assert response.status_code == 401
 
+    def test_suspended_customer_returns_403(
+        self, auth_client_suspended, bank_card, irt_wallet, mock_rate_limit,
+        mock_withdrawal_task
+    ):
+        """
+        A suspended account must not be able to move money out, even with a
+        verified card and a sufficient balance. Suspension has to hold the funds,
+        otherwise blocking a fraudulent account accomplishes nothing.
+        """
+        response = auth_client_suspended.post(
+            self.URL, {'amount': WITHDRAWAL_AMT, 'card_id': bank_card.id}
+        )
+        assert response.status_code == 403
+        assert Withdrawal.objects.count() == 0
+
+    def test_preregister_customer_returns_403(
+        self, auth_client, bank_card, irt_wallet, mock_rate_limit,
+        mock_withdrawal_task
+    ):
+        """A customer who has not completed KYC cannot withdraw either."""
+        response = auth_client.post(
+            self.URL, {'amount': WITHDRAWAL_AMT, 'card_id': bank_card.id}
+        )
+        assert response.status_code == 403
+        assert Withdrawal.objects.count() == 0
+
     def test_amount_below_minimum_returns_400(
-        self, auth_client, bank_card, mock_rate_limit
+        self, auth_client_authenticated, bank_card, mock_rate_limit
     ):
         """Amounts below 100,000 IRT are rejected by the serializer validator."""
-        response = auth_client.post(
+        response = auth_client_authenticated.post(
             self.URL, {'amount': 50_000, 'card_id': bank_card.id}
         )
         assert response.status_code == 400
 
     def test_amount_above_maximum_returns_400(
-        self, auth_client, bank_card, mock_rate_limit
+        self, auth_client_authenticated, bank_card, mock_rate_limit
     ):
         """Amounts above 100,000,000 IRT are rejected by the serializer validator."""
-        response = auth_client.post(
+        response = auth_client_authenticated.post(
             self.URL, {'amount': 200_000_000, 'card_id': bank_card.id}
         )
         assert response.status_code == 400
 
     def test_insufficient_balance_returns_403(
-        self, auth_client, bank_card, mock_rate_limit
+        self, auth_client_authenticated, bank_card, mock_rate_limit
     ):
         """No wallet → zero balance → InsufficientUserBalance → 403."""
-        response = auth_client.post(
+        response = auth_client_authenticated.post(
             self.URL, {'amount': WITHDRAWAL_AMT, 'card_id': bank_card.id}
         )
         assert response.status_code == 403
 
     def test_success_returns_200_with_message(
-        self, auth_client, bank_card, irt_wallet, mock_rate_limit,
+        self, auth_client_authenticated, bank_card, irt_wallet, mock_rate_limit,
         mock_withdrawal_task
     ):
         """Valid amount with sufficient balance must create a withdrawal and return 200."""
-        response = auth_client.post(
+        response = auth_client_authenticated.post(
             self.URL, {'amount': WITHDRAWAL_AMT, 'card_id': bank_card.id}
         )
         assert response.status_code == 200

@@ -12,6 +12,7 @@ from apps.settlements.services.settlement_services import SettlementService
 from apps.settlements.models.withdrawal import Withdrawal
 from apps.exchange.models.wallet import Wallet
 from apps.customers.exceptions.bank_card_exceptions import BankCardNotFound
+from apps.customers.exceptions.customer_exceptions import CustomerSuspended
 from apps.exchange.exceptions.exchange_exceptions import InsufficientUserBalance
 
 from .conftest import WITHDRAWAL_AMT, WALLET_BALANCE
@@ -31,6 +32,39 @@ def _make_request(user):
 
 @pytest.mark.django_db(transaction=True)
 class TestInitiateWithdrawalRequest:
+
+    def test_suspended_customer_raises_customer_suspended(
+        self, user, suspended_customer, bank_card, irt_wallet, mock_withdrawal_task
+    ):
+        """
+        The service must refuse a suspended customer on its own, independently of
+        the view's permission class. The check lives inside the customer row lock,
+        so an admin suspending the account cannot interleave with a request that
+        already passed the permission layer.
+        """
+        with pytest.raises(CustomerSuspended):
+            SettlementService.initiate_withdrawal_request(
+                amount=WITHDRAWAL_AMT,
+                card_id=bank_card.id,
+                request=_make_request(user),
+            )
+
+    def test_suspended_customer_leaves_no_rows_behind(
+        self, user, suspended_customer, bank_card, irt_wallet, mock_withdrawal_task
+    ):
+        """The rejection must roll back cleanly: no Withdrawal, no wallet debit."""
+        initial_wallets = Wallet.objects.filter(customer=suspended_customer).count()
+
+        with pytest.raises(CustomerSuspended):
+            SettlementService.initiate_withdrawal_request(
+                amount=WITHDRAWAL_AMT,
+                card_id=bank_card.id,
+                request=_make_request(user),
+            )
+
+        assert Withdrawal.objects.count() == 0
+        assert Wallet.objects.filter(customer=suspended_customer).count() == initial_wallets
+        mock_withdrawal_task.assert_not_called()
 
     def test_invalid_card_id_raises_bank_card_not_found(
         self, user, customer, irt_wallet, mock_withdrawal_task
