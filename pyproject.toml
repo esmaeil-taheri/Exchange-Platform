@@ -1,19 +1,57 @@
-[build-system]
-requires = ["setuptools>=65", "wheel"]
-build-backend = "setuptools.build_meta"
-
-
 [project]
 name = "django-modular"
 version = "0.1.0"
-description = "Modular Django project with src layout"
+description = "Gold trading platform — modular Django project with src layout"
 requires-python = ">=3.12"
+
+# Runtime dependencies — everything the deployed application needs.
+# Versions stay exactly pinned (as they were in requirements.txt); uv.lock
+# additionally pins the whole transitive tree, so builds are reproducible.
 dependencies = [
-    "Django>=5.0",
-    "djangorestframework>=3.15",
-    "django-environ>=0.11.2",
-    "psycopg2-binary>=2.9",
+    "Django==5.2.11",
+    "djangorestframework==3.16.1",
+    "djangorestframework-simplejwt==5.5.1",
+    "PyJWT==2.10.1",
+    "django-cors-headers==4.9.0",
+    "drf-spectacular==0.29.0",
+    "psycopg2-binary==2.9.11",
+    "dj-database-url==3.0.1",
+    "python-decouple==3.8",
+    "django-redis==6.0.0",
+    "celery==5.6.3",
+    "django-celery-beat==2.9.0",
+    "django-prometheus==2.4.1",
+    "requests==2.33.1",
+    "minio==7.2.20",
+    "pillow==12.2.0",
+    "pyotp==2.9.0",
+    "jdatetime==5.2.0",
+    "gunicorn==23.0.0",
+    "django-jazzmin==3.0.5",
 ]
+
+# Development and CI only — never installed into the production image.
+# Install with: uv sync   (the dev group is synced by default)
+# Skip with:    uv sync --no-dev
+[dependency-groups]
+dev = [
+    "pytest==9.0.3",
+    "pytest-django==4.12.0",
+    "pytest-mock==3.15.1",
+    "pytest-cov==7.1.0",
+    # Same version as .pre-commit-config.yaml and the CI lint job.
+    "ruff==0.12.2",
+    # Celery monitoring UI — only ever run from docker-compose.yml (dev).
+    # docker-compose.prod.yml has no flower service.
+    "flower==2.0.1",
+]
+
+[tool.uv]
+# This repository is a deployable application, not an installable library:
+# `src/` holds two top-level import roots (`apps/` and `config/`) rather than
+# one distribution package, so there is nothing to build. uv therefore only
+# manages the environment and never tries to build or install the project.
+package = false
 
 
 [tool.pytest.ini_options]

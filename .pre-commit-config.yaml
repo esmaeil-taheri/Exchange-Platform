@@ -8,6 +8,13 @@ repos:
       - id: trailing-whitespace
       - id: check-yaml
 
+  # Keeps uv.lock in sync whenever pyproject.toml changes, so `uv sync --locked`
+  # in CI and in both Dockerfiles never fails on a forgotten lock update.
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.8.2
+    hooks:
+      - id: uv-lock
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.2
     hooks:

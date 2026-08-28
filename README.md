@@ -160,8 +160,6 @@ Django modular/
 ├── nginx.conf                      # Reverse proxy config
 ├── pyproject.toml                  # Dependencies (uv) + pytest/coverage config
 ├── uv.lock                         # Fully resolved dependency tree — committed
-├── requirements.txt                # Generated from uv.lock (app + dev)
-├── prod.requirements.txt           # Generated from uv.lock (app only)
 │
 └── src/
     ├── config/                     # Project-level configuration
@@ -666,18 +664,11 @@ uv add --dev <package>     # dev-only dependency
 uv remove <package>
 ```
 
-Each command updates `pyproject.toml` and `uv.lock` together. After any change,
-regenerate the two exported requirement files and commit them alongside the lock:
-
-```bash
-uv export --frozen --no-hashes --no-emit-project -o requirements.txt
-uv export --frozen --no-hashes --no-emit-project --no-dev -o prod.requirements.txt
-```
-
-These exports exist only for tooling that still expects pip — nothing in this
-repository installs from them. The `requirements-drift` CI job fails if they
-fall behind `uv.lock`, and the `uv-lock` pre-commit hook keeps the lock itself
-in sync with `pyproject.toml`.
+Each command updates `pyproject.toml` and `uv.lock` together — commit both.
+There is no `requirements.txt` to regenerate: `uv.lock` is the single source of
+truth, and every install path (both Dockerfiles and all CI jobs) reads it via
+`uv sync --locked`. The `uv-lock` pre-commit hook keeps the lock in sync with
+`pyproject.toml`.
 
 ### Building behind a restricted network
 

@@ -13,6 +13,7 @@ concurrency:
 # None of these ever reach a real service.
 env:
   PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.8.2"
   SECRET_KEY: ci-only-secret-key-0123456789-abcdefghijklmnopqrstuvwxyz
   ALLOWED_HOSTS: ci.example.com
   CORS_ALLOWED_ORIGINS: https://ci.example.com
@@ -45,25 +46,28 @@ jobs:
     name: Lint (ruff)
     runs-on: ubuntu-latest
     # TODO: remove continue-on-error after the one-time cleanup:
-    #   ruff check --fix src && ruff format src
+    #   uv run ruff check --fix src && uv run ruff format src
     # (~80 lint errors and ~200 unformatted files exist today)
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      # ruff is pinned in the dev dependency group, so CI, pre-commit and
+      # local runs all use the same version.
+      - uses: astral-sh/setup-uv@v6
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
 
-      # Same version as .pre-commit-config.yaml (ruff-pre-commit v0.12.2)
-      - name: Install ruff
-        run: pip install ruff==0.12.2
+      - name: Install dependencies
+        run: uv sync --locked
 
       - name: Ruff lint
-        run: ruff check src
+        run: uv run ruff check src
 
       - name: Ruff format check
-        run: ruff format --check src
+        run: uv run ruff format --check src
 
   test-sqlite:
     name: Tests (SQLite + coverage)
@@ -71,16 +75,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+          enable-cache: true
 
+      # --locked fails if uv.lock has drifted from pyproject.toml, so a
+      # forgotten `uv lock` is caught here rather than at image build time.
       - name: Install dependencies
-        run: pip install -r requirements.txt pytest-cov
+        run: uv sync --locked
 
       - name: Run test suite
-        run: pytest src/apps -q --cov=src --cov-report=term-missing:skip-covered --cov-report=xml
+        run: uv run pytest src/apps -q --cov=src --cov-report=term-missing:skip-covered --cov-report=xml
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -114,16 +121,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+          enable-cache: true
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: uv sync --locked
 
       - name: Run test suite on PostgreSQL
-        run: pytest src/apps -q
+        run: uv run pytest src/apps -q
 
   django-checks:
     name: Migration drift + deploy checks
@@ -131,21 +139,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+          enable-cache: true
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: uv sync --locked
 
       - name: No missing migrations
-        run: python manage.py makemigrations --check --dry-run
+        run: uv run python manage.py makemigrations --check --dry-run
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
 
       - name: Django deploy checks
-        run: python manage.py check --deploy
+        run: uv run python manage.py check --deploy
         env:
           DJANGO_SETTINGS_MODULE: config.settings.prod
           DEBUG: "False"

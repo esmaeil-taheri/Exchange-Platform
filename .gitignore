@@ -185,3 +185,5 @@ src/static/
 
 TODO.md
 audit.html
+# Runtime logs (incl. rotated files like app.log.2026-08-27 that *.log misses)
+src/logs/
