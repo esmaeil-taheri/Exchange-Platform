@@ -65,46 +65,69 @@ def process_withdrawal_requests(self, withdrawal_id):
                 return f"Withdrawal {withdrawal_id} already updated"
             
             if response.get("error"):
-
                 error_message = response.get("message", "Unknown PSP error")
-
+                is_definitive_failure = response.get("is_definitive_failure", False)
                 now_ts = get_date_time()['timestamp']
 
-                withdrawal.status = Withdrawal.WithdrawalStatus.FAILED
-                withdrawal.errors = error_message
-                withdrawal.save(update_fields=["status", "errors"])
+                if is_definitive_failure:
+                    # Definitive business rejection by PSP (e.g. invalid IBAN, account mismatch)
+                    # Safe to mark FAILED and refund immediately
+                    withdrawal.status = Withdrawal.WithdrawalStatus.FAILED
+                    withdrawal.errors = error_message
+                    withdrawal.save(update_fields=["status", "errors"])
 
-                Wallet.objects.create(
-                    customer=withdrawal.customer,
-                    wallet_type='irt',
-                    amount=withdrawal.amount,
-                    desc=f'برگشت وجه بابت شکست تسویه — درخواست برداشت #{withdrawal.id}',
-                    ip='0.0.0.0',
-                    created_at=now_ts,
-                    verified_at=now_ts,
-                    is_verified=True,
-                )
+                    Wallet.objects.create(
+                        customer=withdrawal.customer,
+                        wallet_type='irt',
+                        amount=withdrawal.amount,
+                        desc=f'برگشت وجه بابت رد درخواست تسویه #{withdrawal.id} توسط درگاه: {error_message}',
+                        ip='0.0.0.0',
+                        created_at=now_ts,
+                        verified_at=now_ts,
+                        is_verified=True,
+                    )
 
-                logger.error(
-                    f"[task=process_withdrawal] Settlement FAILED — IRT refunded | "
-                    f"withdrawal_id={withdrawal_id} customer_id={withdrawal.customer_id} "
-                    f"amount={withdrawal.amount}IRT reason={error_message}"
-                )
+                    logger.warning(
+                        f"[task=process_withdrawal] Settlement rejected definitively by PSP — IRT refunded | "
+                        f"withdrawal_id={withdrawal_id} customer_id={withdrawal.customer_id} "
+                        f"amount={withdrawal.amount}IRT reason={error_message}"
+                    )
 
-                return f"PSP Error: {error_message}"
+                    return f"PSP Definitive Error: {error_message}"
 
-            settlement = response["data"]["settlement"][0]
+                else:
+                    # Network timeout / Connection error / 5xx (Unconfirmed state) — DO NOT REFUND!
+                    # Mark as SENT_TO_BANK with track_id so inquiry_processed_withdrawals can safely verify status.
+                    withdrawal.track_id = track_id
+                    withdrawal.status = Withdrawal.WithdrawalStatus.SENT_TO_BANK
+                    withdrawal.bank_send = True
+                    withdrawal.errors = f"Unconfirmed PSP state: {error_message}"
+                    withdrawal.process_time = timezone.now()
+                    withdrawal.save(update_fields=[
+                        "track_id", "status", "bank_send", "errors", "process_time"
+                    ])
+
+                    logger.warning(
+                        f"[task=process_withdrawal] Settlement network/timeout error — "
+                        f"marked SENT_TO_BANK for inquiry (no refund) | "
+                        f"withdrawal_id={withdrawal_id} track_id={track_id} error={error_message}"
+                    )
+
+                    return f"PSP Unconfirmed (marked for inquiry): {error_message}"
+
+            settlement_data = response.get("data", {}).get("settlement", [])
+            settlement = settlement_data[0] if isinstance(settlement_data, list) and settlement_data else (settlement_data if isinstance(settlement_data, dict) else {})
 
             withdrawal.track_id = track_id
-            withdrawal.transaction_id = str(settlement.get("transaction_id"))
-            withdrawal.vandar_amount = settlement.get("amount")
+            withdrawal.transaction_id = str(settlement.get("transaction_id", ""))
+            withdrawal.vandar_amount = settlement.get("amount", withdrawal.amount)
             withdrawal.wage = settlement.get("wage_toman", 0)
-            withdrawal.vandar_status = settlement.get("status")
-            withdrawal.iban = settlement.get("iban")
-            withdrawal.desc = settlement.get("description")
-            withdrawal.settlement_date = settlement.get("settlement_date")
-            withdrawal.settlement_time = settlement.get("settlement_time")
-            withdrawal.is_instant = settlement.get("is_instant")
+            withdrawal.vandar_status = settlement.get("status", "")
+            withdrawal.iban = settlement.get("iban", iban)
+            withdrawal.desc = settlement.get("description", "")
+            withdrawal.settlement_date = settlement.get("settlement_date", "")
+            withdrawal.settlement_time = settlement.get("settlement_time", "")
+            withdrawal.is_instant = settlement.get("is_instant", True)
 
             withdrawal.status = Withdrawal.WithdrawalStatus.SENT_TO_BANK
             withdrawal.bank_send = True
