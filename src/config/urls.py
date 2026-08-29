@@ -5,10 +5,14 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView
 )
+from apps.core.views import HealthCheckView
 
 urlpatterns = [
     # Admin
     path("admin/", admin.site.urls),
+
+    # Health Check
+    path("api/health/", HealthCheckView.as_view(), name="health-check"),
 
     # Prometheus
     path("", include("django_prometheus.urls")),
