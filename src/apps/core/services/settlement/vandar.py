@@ -175,8 +175,14 @@ class VandarClient:
             logger.error(f"[vandar] inquiry_settlement — connection error | track_id={track_id} error={e}")
             return {"error": True, "message": "Connection error"}
         except requests.exceptions.HTTPError as e:
-            logger.error(f"[vandar] inquiry_settlement — HTTP error | track_id={track_id} status={e.response.status_code}")
-            return {"error": True, "message": f"HTTP {e.response.status_code}"}
+            status_code = e.response.status_code if e.response is not None else 500
+            logger.error(f"[vandar] inquiry_settlement — HTTP error | track_id={track_id} status={status_code}")
+            return {
+                "error": True,
+                "status_code": status_code,
+                "is_not_found": status_code == 404,
+                "message": f"HTTP {status_code}"
+            }
 
     def cancel_settlement(self, track_id, cancel_mode="PENDING"):
         url = f"{self.base_url}/v4/business/{self.business}/settlement/{track_id}"
