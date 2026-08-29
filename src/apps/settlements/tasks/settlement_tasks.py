@@ -30,25 +30,50 @@ def process_withdrawal_requests(self, withdrawal_id):
     vandar = VandarClient(token=token, business=business)
 
     try:
-        withdrawal = Withdrawal.objects.get(id=withdrawal_id)
+        # ── Step 1: Claim Phase (Atomic & Lock-Safe) ───────────────────────────
+        # Lock the row with select_for_update(skip_locked=True) and transition
+        # status to PROCESSING inside a short transaction. This prevents any
+        # concurrent worker from claiming or double-sending this withdrawal.
+        with transaction.atomic():
+            withdrawal = (
+                Withdrawal.objects
+                .select_for_update(skip_locked=True)
+                .select_related('customer__user', 'card')
+                .filter(id=withdrawal_id, status=Withdrawal.WithdrawalStatus.PENDING)
+                .first()
+            )
 
-        if withdrawal.status != Withdrawal.WithdrawalStatus.PENDING:
-            return f"Withdrawal {withdrawal_id} already processed"
+            if withdrawal is None:
+                logger.info(
+                    f"[task=process_withdrawal] Withdrawal {withdrawal_id} skipped — "
+                    f"already claimed or not in PENDING status"
+                )
+                return f"Withdrawal {withdrawal_id} already processed or currently claimed"
 
-        if withdrawal.track_id:
-            return f"Withdrawal {withdrawal_id} already has track_id"
+            if withdrawal.track_id:
+                logger.info(
+                    f"[task=process_withdrawal] Withdrawal {withdrawal_id} skipped — "
+                    f"already has track_id: {withdrawal.track_id}"
+                )
+                return f"Withdrawal {withdrawal_id} already has track_id"
 
-        customer = withdrawal.customer
-        card = withdrawal.card
-        
-        track_id = str(withdrawal.id)
+            track_id = str(withdrawal.id)
+            customer = withdrawal.customer
+            card = withdrawal.card
 
-        iban = card.Shaba_number
-        national_code = customer.user.national_id
-        birth_date = customer.birth_date
+            iban = card.Shaba_number
+            national_code = customer.user.national_id
+            birth_date = customer.birth_date
+            amount_to_settle = withdrawal.amount - vandar.wage
 
+            withdrawal.status = Withdrawal.WithdrawalStatus.PROCESSING
+            withdrawal.track_id = track_id
+            withdrawal.save(update_fields=['status', 'track_id'])
+
+        # ── Step 2: External HTTP Call (Outside DB Lock) ──────────────────────
+        # DB connection is released before making the network request to Vandar.
         response = vandar.create_settlement(
-            amount=withdrawal.amount - vandar.wage,
+            amount=amount_to_settle,
             iban=iban,
             track_id=track_id,
             payment_number=str(withdrawal.id),
@@ -57,13 +82,10 @@ def process_withdrawal_requests(self, withdrawal_id):
             birth_date=birth_date,
         )
 
+        # ── Step 3: Finalize / Settle Phase (Atomic) ──────────────────────────
         with transaction.atomic():
-
             withdrawal = Withdrawal.objects.select_for_update().get(id=withdrawal_id)
 
-            if withdrawal.status != Withdrawal.WithdrawalStatus.PENDING:
-                return f"Withdrawal {withdrawal_id} already updated"
-            
             if response.get("error"):
                 error_message = response.get("message", "Unknown PSP error")
                 is_definitive_failure = response.get("is_definitive_failure", False)
@@ -98,13 +120,12 @@ def process_withdrawal_requests(self, withdrawal_id):
                 else:
                     # Network timeout / Connection error / 5xx (Unconfirmed state) — DO NOT REFUND!
                     # Mark as SENT_TO_BANK with track_id so inquiry_processed_withdrawals can safely verify status.
-                    withdrawal.track_id = track_id
                     withdrawal.status = Withdrawal.WithdrawalStatus.SENT_TO_BANK
                     withdrawal.bank_send = True
                     withdrawal.errors = f"Unconfirmed PSP state: {error_message}"
                     withdrawal.process_time = timezone.now()
                     withdrawal.save(update_fields=[
-                        "track_id", "status", "bank_send", "errors", "process_time"
+                        "status", "bank_send", "errors", "process_time"
                     ])
 
                     logger.warning(
@@ -118,7 +139,6 @@ def process_withdrawal_requests(self, withdrawal_id):
             settlement_data = response.get("data", {}).get("settlement", [])
             settlement = settlement_data[0] if isinstance(settlement_data, list) and settlement_data else (settlement_data if isinstance(settlement_data, dict) else {})
 
-            withdrawal.track_id = track_id
             withdrawal.transaction_id = str(settlement.get("transaction_id", ""))
             withdrawal.vandar_amount = settlement.get("amount", withdrawal.amount)
             withdrawal.wage = settlement.get("wage_toman", 0)
@@ -156,8 +176,8 @@ def inquiry_processed_withdrawals():
     business = settings.VANDAR_BUSINESS_NAME
 
     pendings = Withdrawal.objects.filter(
-        status=Withdrawal.WithdrawalStatus.SENT_TO_BANK
-    ).order_by("created_at")[:5]
+        status__in=[Withdrawal.WithdrawalStatus.SENT_TO_BANK, Withdrawal.WithdrawalStatus.PROCESSING]
+    ).exclude(track_id='').order_by("created_at")[:5]
 
     if not pendings:
         return
@@ -170,7 +190,7 @@ def inquiry_processed_withdrawals():
 
             withdrawal = Withdrawal.objects.get(id=pending.id)
 
-            if withdrawal.status != Withdrawal.WithdrawalStatus.SENT_TO_BANK:
+            if withdrawal.status not in [Withdrawal.WithdrawalStatus.SENT_TO_BANK, Withdrawal.WithdrawalStatus.PROCESSING]:
                 continue
 
             response = vandar.inquiry_settlement(withdrawal.track_id)
@@ -186,6 +206,10 @@ def inquiry_processed_withdrawals():
             with transaction.atomic():
 
                 withdrawal = Withdrawal.objects.select_for_update().get(id=pending.id)
+
+                # Re-check status under row lock to prevent race conditions across parallel inquiry tasks
+                if withdrawal.status not in [Withdrawal.WithdrawalStatus.SENT_TO_BANK, Withdrawal.WithdrawalStatus.PROCESSING]:
+                    continue
 
                 withdrawal.vandar_status = status
                 withdrawal.inquiry_check = True

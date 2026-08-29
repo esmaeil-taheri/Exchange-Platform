@@ -8,6 +8,7 @@ class Withdrawal(models.Model):
 
     class WithdrawalStatus(models.TextChoices):
         PENDING = 'pending', 'Pending'
+        PROCESSING = 'processing', 'Processing'
         SENT_TO_BANK = 'sent_to_bank', 'Sent To Bank'
         COMPLETED = 'completed', 'Completed'
         FAILED = 'failed', 'Failed'

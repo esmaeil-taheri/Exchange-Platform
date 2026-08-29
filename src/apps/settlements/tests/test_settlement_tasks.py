@@ -31,6 +31,82 @@ class TestProcessWithdrawalRequests:
             track_id='',
         )
 
+    def test_already_processing_or_claimed_is_skipped(
+        self, customer, bank_card, mocker
+    ):
+        """
+        TASK 1.2:
+        If a withdrawal is already in PROCESSING status (e.g. claimed by another worker),
+        a concurrent worker must exit immediately without calling Vandar.
+        """
+        withdrawal = Withdrawal.objects.create(
+            customer=customer,
+            card=bank_card,
+            amount=WITHDRAWAL_AMT,
+            settlement_method='پایا',
+            status=Withdrawal.WithdrawalStatus.PROCESSING,
+            track_id='claimed-track',
+        )
+
+        mock_vandar = mocker.patch('apps.settlements.tasks.settlement_tasks.VandarClient')
+        mock_instance = MagicMock()
+        mock_vandar.return_value = mock_instance
+
+        result = process_withdrawal_requests(withdrawal.id)
+
+        # Vandar create_settlement must NEVER be called
+        mock_instance.create_settlement.assert_not_called()
+        assert "already processed or currently claimed" in result or "already has track_id" in result
+
+    def test_claim_phase_sets_processing_before_external_call(
+        self, customer, bank_card, mocker
+    ):
+        """
+        TASK 1.2:
+        Verifies that status is atomically set to PROCESSING before Vandar create_settlement runs.
+        """
+        withdrawal = self._create_pending_withdrawal(customer, bank_card)
+
+        observed_status = []
+
+        def side_effect_inspect_status(*args, **kwargs):
+            # Inspect the DB row while create_settlement is running
+            w = Withdrawal.objects.get(id=withdrawal.id)
+            observed_status.append(w.status)
+            return {
+                "status": 1,
+                "data": {
+                    "settlement": [
+                        {
+                            "transaction_id": "TX-111",
+                            "amount": WITHDRAWAL_AMT - 6000,
+                            "wage_toman": 6000,
+                            "status": "PENDING",
+                            "iban": bank_card.Shaba_number,
+                            "description": "test",
+                            "settlement_date": "1403/02/01",
+                            "settlement_time": "10:00",
+                            "is_instant": True,
+                        }
+                    ]
+                }
+            }
+
+        mock_vandar = mocker.patch('apps.settlements.tasks.settlement_tasks.VandarClient')
+        mock_instance = MagicMock()
+        mock_instance.wage = 6000
+        mock_instance.create_settlement.side_effect = side_effect_inspect_status
+        mock_vandar.return_value = mock_instance
+
+        process_withdrawal_requests(withdrawal.id)
+
+        # While Vandar was being called, status in DB MUST HAVE BEEN 'processing'
+        assert observed_status == [Withdrawal.WithdrawalStatus.PROCESSING]
+
+        # After completion, status is 'sent_to_bank'
+        withdrawal.refresh_from_db()
+        assert withdrawal.status == Withdrawal.WithdrawalStatus.SENT_TO_BANK
+
     def test_timeout_does_not_refund_wallet_and_marks_for_inquiry(
         self, customer, bank_card, mocker
     ):
