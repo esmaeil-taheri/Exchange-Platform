@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from celery import shared_task
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from django.conf import settings
 
@@ -14,6 +15,27 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+
+# How long a withdrawal may sit un-dispatched before the safety net requeues it.
+# Low stakes: process_withdrawal_requests is idempotent, so a needless requeue
+# costs nothing.
+STUCK_WITHDRAWAL_AGE_MINUTES = 5
+STUCK_WITHDRAWAL_BATCH_SIZE = 20
+
+# How long we wait before treating a PSP "track_id not found" as proof the payout
+# never reached the bank, and refunding the customer.
+#
+# Deliberately NOT the 5 minutes above. Refunding here is irreversible in
+# practice: if the settlement was actually in flight and merely not yet visible
+# to the inquiry API, the customer is paid twice. Paya settles in batches, so a
+# freshly submitted payout can legitimately be unqueryable for a long while.
+# The cost of waiting is a delayed refund; the cost of being early is a double
+# payout. Wait.
+UNCONFIRMED_SETTLEMENT_REFUND_AGE_MINUTES = 180
+
+# Rows examined per inquiry run.
+INQUIRY_BATCH_SIZE = 5
 
 
 @shared_task(
@@ -37,7 +59,7 @@ def process_withdrawal_requests(self, withdrawal_id):
         with transaction.atomic():
             withdrawal = (
                 Withdrawal.objects
-                .select_for_update(skip_locked=True)
+                .select_for_update(of=('self',), skip_locked=True)
                 .select_related('customer__user', 'card')
                 .filter(id=withdrawal_id, status=Withdrawal.WithdrawalStatus.PENDING)
                 .first()
@@ -102,7 +124,7 @@ def process_withdrawal_requests(self, withdrawal_id):
                         customer=withdrawal.customer,
                         wallet_type='irt',
                         amount=withdrawal.amount,
-                        desc=f'برگشت وجه بابت رد درخواست تسویه #{withdrawal.id} توسط درگاه: {error_message}',
+                        desc=f'برگشت وجه بابت رد درخواست تسویه #{withdrawal.id} توسط درگاه',
                         ip='0.0.0.0',
                         created_at=now_ts,
                         verified_at=now_ts,
@@ -139,7 +161,8 @@ def process_withdrawal_requests(self, withdrawal_id):
             settlement_data = response.get("data", {}).get("settlement", [])
             settlement = settlement_data[0] if isinstance(settlement_data, list) and settlement_data else (settlement_data if isinstance(settlement_data, dict) else {})
 
-            withdrawal.transaction_id = str(settlement.get("transaction_id", ""))
+            raw_tx_id = settlement.get("transaction_id")
+            withdrawal.transaction_id = str(raw_tx_id) if raw_tx_id else None
             withdrawal.vandar_amount = settlement.get("amount", withdrawal.amount)
             withdrawal.wage = settlement.get("wage_toman", 0)
             withdrawal.vandar_status = settlement.get("status", "")
@@ -175,9 +198,14 @@ def inquiry_processed_withdrawals():
     token = settings.VANDAR_API_KEY
     business = settings.VANDAR_BUSINESS_NAME
 
+    # Least-recently-inquired first (never-inquired rows lead). Ordering by
+    # created_at instead would let a row the PSP keeps erroring on sit at the head
+    # of the window forever, starving every newer withdrawal of its inquiry.
     pendings = Withdrawal.objects.filter(
         status__in=[Withdrawal.WithdrawalStatus.SENT_TO_BANK, Withdrawal.WithdrawalStatus.PROCESSING]
-    ).exclude(track_id='').order_by("created_at")[:5]
+    ).exclude(track_id='').order_by(
+        F('last_inquiry_at').asc(nulls_first=True), 'created_at'
+    )[:INQUIRY_BATCH_SIZE]
 
     if not pendings:
         return
@@ -193,11 +221,52 @@ def inquiry_processed_withdrawals():
             if withdrawal.status not in [Withdrawal.WithdrawalStatus.SENT_TO_BANK, Withdrawal.WithdrawalStatus.PROCESSING]:
                 continue
 
+            # Stamp before the call: an attempt that raises must still rotate this
+            # row to the back, otherwise it would be retried on every single run.
+            Withdrawal.objects.filter(id=withdrawal.id).update(last_inquiry_at=timezone.now())
+
             response = vandar.inquiry_settlement(withdrawal.track_id)
 
             if response.get("error"):
-                withdrawal.errors = response.get("message")
-                withdrawal.save(update_fields=["errors"])
+                error_msg = response.get("message")
+                is_not_found = response.get("is_not_found", False)
+                age_minutes = (timezone.now() - withdrawal.created_at).total_seconds() / 60
+
+                # If PSP definitively confirms track_id was not found (404) AND the withdrawal
+                # is older than the safety threshold, the worker had crashed before Vandar received
+                # the payout. We safely fail the withdrawal and refund the wallet.
+                if is_not_found and age_minutes >= UNCONFIRMED_SETTLEMENT_REFUND_AGE_MINUTES:
+                    with transaction.atomic():
+                        withdrawal = Withdrawal.objects.select_for_update().get(id=pending.id)
+                        if withdrawal.status not in [Withdrawal.WithdrawalStatus.SENT_TO_BANK, Withdrawal.WithdrawalStatus.PROCESSING]:
+                            continue
+
+                        withdrawal.status = Withdrawal.WithdrawalStatus.FAILED
+                        withdrawal.is_verified = False
+                        withdrawal.errors = "PSP track_id not found — request never reached gateway"
+                        withdrawal.save(update_fields=["status", "is_verified", "errors"])
+
+                        now_ts = get_date_time()['timestamp']
+                        Wallet.objects.create(
+                            customer=withdrawal.customer,
+                            wallet_type='irt',
+                            amount=withdrawal.amount,
+                            desc=f'برگشت وجه بابت عدم ثبت درخواست تسویه در درگاه — درخواست برداشت #{withdrawal.id}',
+                            ip='0.0.0.0',
+                            created_at=now_ts,
+                            verified_at=now_ts,
+                            is_verified=True,
+                        )
+
+                        logger.warning(
+                            f"[task=inquiry_withdrawal] Stale withdrawal not found in PSP — FAILED and refunded | "
+                            f"withdrawal_id={withdrawal.id} customer_id={withdrawal.customer_id} "
+                            f"amount={withdrawal.amount}IRT"
+                        )
+                else:
+                    withdrawal.errors = error_msg
+                    withdrawal.save(update_fields=["errors"])
+
                 continue
 
             settlement = response["data"]["settlements"][0]
@@ -264,20 +333,22 @@ def inquiry_processed_withdrawals():
             continue
 
 
-STUCK_WITHDRAWAL_AGE_MINUTES = 5
-STUCK_WITHDRAWAL_BATCH_SIZE = 20
-
-
 @shared_task()
 def process_stuck_withdrawals():
     """
-    Safety net: requeue PENDING withdrawals whose processing task was lost.
+    Safety net: requeue PENDING withdrawals that were never dispatched.
 
-    A withdrawal stays PENDING with an empty track_id if queueing
-    process_withdrawal_requests failed (broker down) or the task was dropped.
-    The user's IRT is already debited at that point, so the row must not be
-    left behind. Requeueing is safe because process_withdrawal_requests is
-    idempotent (it checks both status and track_id before doing anything).
+    A withdrawal stays PENDING with an empty track_id when queueing
+    process_withdrawal_requests failed (broker down) or the task was dropped
+    before it ran. The customer's IRT is already debited at that point, so the
+    row must not be left behind. Requeueing is safe because
+    process_withdrawal_requests is idempotent — it claims on status and track_id.
+
+    Only PENDING rows are eligible. A withdrawal that reached PROCESSING already
+    has its track_id committed (both are written in the same save), so it may
+    have been sent to the PSP and must never be blindly resubmitted from here;
+    inquiry_processed_withdrawals owns that recovery and resolves it against the
+    PSP instead.
 
     Only rows older than STUCK_WITHDRAWAL_AGE_MINUTES are picked up, so this
     never races with the normal apply_async(countdown=10) path.

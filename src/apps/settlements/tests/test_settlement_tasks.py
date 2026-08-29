@@ -14,6 +14,7 @@ from apps.exchange.models.wallet import Wallet
 from apps.settlements.tasks.settlement_tasks import (
     process_withdrawal_requests,
     inquiry_processed_withdrawals,
+    UNCONFIRMED_SETTLEMENT_REFUND_AGE_MINUTES,
 )
 from .conftest import WITHDRAWAL_AMT
 
@@ -244,6 +245,47 @@ class TestProcessWithdrawalRequests:
         assert Wallet.objects.filter(customer=customer).count() == initial_wallets_count
         assert "successfully sent to bank" in result
 
+    def test_multiple_withdrawals_without_transaction_id_store_none_without_unique_collision(
+        self, customer, bank_card, mocker
+    ):
+        """
+        Verifies that when PSP response lacks transaction_id (None or missing),
+        the field is stored as None (SQL NULL) instead of empty string "",
+        allowing multiple withdrawals without violating unique constraint.
+        """
+        w1 = self._create_pending_withdrawal(customer, bank_card)
+        w2 = self._create_pending_withdrawal(customer, bank_card)
+
+        mock_vandar = mocker.patch('apps.settlements.tasks.settlement_tasks.VandarClient')
+        mock_instance = MagicMock()
+        mock_instance.wage = 6000
+        # No transaction_id in response
+        mock_instance.create_settlement.return_value = {
+            "status": 1,
+            "data": {
+                "settlement": [
+                    {
+                        "amount": WITHDRAWAL_AMT - 6000,
+                        "status": "PENDING",
+                    }
+                ]
+            }
+        }
+        mock_vandar.return_value = mock_instance
+
+        # Process first withdrawal
+        process_withdrawal_requests(w1.id)
+        # Process second withdrawal (would crash with IntegrityError if "" was stored)
+        process_withdrawal_requests(w2.id)
+
+        w1.refresh_from_db()
+        w2.refresh_from_db()
+
+        assert w1.transaction_id is None
+        assert w2.transaction_id is None
+        assert w1.status == Withdrawal.WithdrawalStatus.SENT_TO_BANK
+        assert w2.status == Withdrawal.WithdrawalStatus.SENT_TO_BANK
+
 
 @pytest.mark.django_db(transaction=True)
 class TestInquiryProcessedWithdrawals:
@@ -310,3 +352,121 @@ class TestInquiryProcessedWithdrawals:
         assert Wallet.objects.filter(customer=customer).count() == initial_wallets_count + 1
         refund = Wallet.objects.filter(customer=customer, amount__gt=0).last()
         assert refund.amount == WITHDRAWAL_AMT
+
+    def test_inquiry_recovers_stale_processing_row_when_psp_returns_404(
+        self, customer, bank_card, mocker
+    ):
+        """
+        A withdrawal stuck in PROCESSING for longer than
+        UNCONFIRMED_SETTLEMENT_REFUND_AGE_MINUTES, whose track_id the PSP reports
+        as 404, never reached the gateway: mark it FAILED and refund.
+        """
+        from datetime import timedelta
+        withdrawal = Withdrawal.objects.create(
+            customer=customer,
+            card=bank_card,
+            amount=WITHDRAWAL_AMT,
+            settlement_method='پایا',
+            status=Withdrawal.WithdrawalStatus.PROCESSING,
+            track_id='track-999',
+        )
+        # Comfortably past the refund threshold
+        Withdrawal.objects.filter(id=withdrawal.id).update(
+            created_at=timezone.now()
+            - timedelta(minutes=UNCONFIRMED_SETTLEMENT_REFUND_AGE_MINUTES + 60)
+        )
+        initial_wallets_count = Wallet.objects.filter(customer=customer).count()
+
+        mock_vandar = mocker.patch('apps.settlements.tasks.settlement_tasks.VandarClient')
+        mock_instance = MagicMock()
+        mock_instance.inquiry_settlement.return_value = {
+            "error": True,
+            "is_not_found": True,
+            "status_code": 404,
+            "message": "HTTP 404",
+        }
+        mock_vandar.return_value = mock_instance
+
+        inquiry_processed_withdrawals()
+
+        withdrawal.refresh_from_db()
+        assert withdrawal.status == Withdrawal.WithdrawalStatus.FAILED
+        assert withdrawal.is_verified is False
+        assert "PSP track_id not found" in withdrawal.errors
+        assert Wallet.objects.filter(customer=customer).count() == initial_wallets_count + 1
+        refund = Wallet.objects.filter(customer=customer, amount__gt=0).last()
+        assert refund.amount == WITHDRAWAL_AMT
+
+    def test_young_404_row_is_not_refunded_yet(
+        self, customer, bank_card, mocker
+    ):
+        """
+        A 404 alone must not trigger a refund. A settlement submitted moments ago
+        can legitimately be unqueryable while Paya batches it; refunding then,
+        while the transfer still completes, pays the customer twice. Below the
+        threshold the row is left alone for a later run to resolve.
+        """
+        from datetime import timedelta
+
+        withdrawal = Withdrawal.objects.create(
+            customer=customer,
+            card=bank_card,
+            amount=WITHDRAWAL_AMT,
+            settlement_method='پایا',
+            status=Withdrawal.WithdrawalStatus.PROCESSING,
+            track_id='track-fresh',
+        )
+        Withdrawal.objects.filter(id=withdrawal.id).update(
+            created_at=timezone.now()
+            - timedelta(minutes=UNCONFIRMED_SETTLEMENT_REFUND_AGE_MINUTES - 10)
+        )
+        initial_wallets_count = Wallet.objects.filter(customer=customer).count()
+
+        mock_vandar = mocker.patch('apps.settlements.tasks.settlement_tasks.VandarClient')
+        mock_instance = MagicMock()
+        mock_instance.inquiry_settlement.return_value = {
+            "error": True,
+            "is_not_found": True,
+            "status_code": 404,
+            "message": "HTTP 404",
+        }
+        mock_vandar.return_value = mock_instance
+
+        inquiry_processed_withdrawals()
+
+        withdrawal.refresh_from_db()
+        assert withdrawal.status == Withdrawal.WithdrawalStatus.PROCESSING
+        assert Wallet.objects.filter(customer=customer).count() == initial_wallets_count
+
+    def test_stuck_withdrawals_ignores_processing_rows(
+        self, customer, bank_card, mocker
+    ):
+        """
+        A PROCESSING row always carries a track_id (both are written in the same
+        save), so it may already be at the PSP. The stuck-withdrawal net must
+        never resubmit it — that is inquiry_processed_withdrawals' job.
+        """
+        from datetime import timedelta
+        from apps.settlements.tasks.settlement_tasks import process_stuck_withdrawals
+
+        withdrawal = Withdrawal.objects.create(
+            customer=customer,
+            card=bank_card,
+            amount=WITHDRAWAL_AMT,
+            settlement_method='پایا',
+            status=Withdrawal.WithdrawalStatus.PROCESSING,
+            track_id='track-inflight',
+        )
+        Withdrawal.objects.filter(id=withdrawal.id).update(
+            created_at=timezone.now() - timedelta(minutes=10)
+        )
+
+        mock_delay = mocker.patch(
+            'apps.settlements.tasks.settlement_tasks.process_withdrawal_requests.delay'
+        )
+
+        process_stuck_withdrawals()
+
+        withdrawal.refresh_from_db()
+        assert withdrawal.status == Withdrawal.WithdrawalStatus.PROCESSING
+        mock_delay.assert_not_called()

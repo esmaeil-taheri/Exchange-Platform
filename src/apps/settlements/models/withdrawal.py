@@ -152,6 +152,17 @@ class Withdrawal(models.Model):
         verbose_name='Processed At'
     )
 
+    # When inquiry_processed_withdrawals last asked the PSP about this row.
+    # NULL = never asked. The inquiry task orders by this (nulls first) so a row
+    # the PSP keeps erroring on rotates to the back instead of permanently
+    # occupying the head of the batch window.
+    last_inquiry_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        db_index=True,
+        verbose_name='Last Inquiry At'
+    )
+
     confirmed_at = models.DateTimeField(
         blank=True,
         null=True,
