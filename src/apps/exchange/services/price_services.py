@@ -236,3 +236,57 @@ class PriceService:
             "maintenance": int(maintenance_fee),
             "total": int(total_amount),
         }
+
+    @staticmethod
+    def calculate_sell_total_from_snapshot(
+        *,
+        gold_amount: Decimal,
+        unit_price_irt: Decimal,
+        currency,
+    ) -> dict:
+        """
+        This method calculates the total amount for a sell transaction based on a price snapshot.
+        """
+        gold_amount = Decimal(str(gold_amount))
+        unit_price_irt = Decimal(str(unit_price_irt))
+
+        # ------------------------------
+        #     Gold Price
+        # ------------------------------
+        gold_price_toman = (unit_price_irt * gold_amount).quantize(
+            Decimal("1"), rounding=ROUND_HALF_UP
+        )
+
+        # ------------------------------
+        # Calculate sell fee based on gold amount
+        # ------------------------------
+        if gold_amount < Decimal("0.5"):
+            sell_fee = currency.fixed_sell_fee_toman
+
+        elif Decimal("0.5") <= gold_amount < Decimal("1"):
+            percent = currency.sell_fee_percent / Decimal("100")
+            fee_at_1g = (unit_price_irt * Decimal("1") * percent)
+
+            start_fee = currency.fixed_sell_fee_toman
+            end_fee = fee_at_1g
+
+            progress = (gold_amount - Decimal("0.5")) / Decimal("0.5")
+            sell_fee = start_fee + (end_fee - start_fee) * progress
+            sell_fee = sell_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+        else:
+            percent = currency.sell_fee_percent / Decimal("100")
+            sell_fee = (unit_price_irt * gold_amount * percent)
+            sell_fee = sell_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+        # ------------------------------
+        #     total
+        # ------------------------------
+        total_amount = gold_price_toman - sell_fee
+
+        return {
+            "gold_price": int(gold_price_toman),
+            "fee": int(sell_fee),
+            "maintenance": 0,
+            "total": int(total_amount),
+        }

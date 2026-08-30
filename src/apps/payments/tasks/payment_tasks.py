@@ -1,3 +1,4 @@
+from decimal import Decimal, ROUND_DOWN
 from django.db import transaction
 from celery import shared_task
 from django.utils import timezone
@@ -73,12 +74,15 @@ def process_buy_invoice_task(self, invoice_id):
                 return f"Invoice {invoice_id} already processed"
 
             total_price = invoice.total_price - (invoice.fee + invoice.maintenance_fee)
+            gold_amount = (Decimal(str(total_price)) / Decimal(str(invoice.unit_price))).quantize(
+                Decimal("0.0001"), rounding=ROUND_DOWN
+            )
 
             txn = Transaction.objects.create(
                 customer=invoice.customer,
                 invoice=invoice,
                 currency=currency,
-                amount=total_price / invoice.unit_price,
+                amount=gold_amount,
                 fee_irt=invoice.fee,
                 unit_price_irt=invoice.unit_price,
                 total_price_irt=invoice.total_price,

@@ -304,7 +304,13 @@ def process_sell_transactions():
 
     for trans in pendings:
 
-        transaction_total_price = int(trans.amount * trans.unit_price_irt) - trans.fee_irt
+        currency = trans.currency
+
+        transaction_total_price = PriceService.calculate_sell_total_from_snapshot(
+            gold_amount=trans.amount,
+            unit_price_irt=trans.unit_price_irt,
+            currency=currency
+        )
 
         with transaction.atomic():
 
@@ -319,7 +325,6 @@ def process_sell_transactions():
             wallet = trans.wallet
             wallet_amount = abs(wallet.amount)
             customer = trans.customer
-            currency = trans.currency
             last_price = CurrencyPriceLog.objects.filter(currency=currency).last()
 
             if last_price is None:
@@ -337,6 +342,7 @@ def process_sell_transactions():
                 trans.is_checked = True
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Negative XAU balance"
+                trans.processed_at = now_ts
                 trans.save()
                 logger.warning(
                     f"[task=process_sell] Transaction REJECTED — negative XAU balance | "
@@ -347,10 +353,11 @@ def process_sell_transactions():
                 )
                 continue
 
-            if transaction_total_price != trans.total_price_irt:
+            if transaction_total_price['total'] != trans.total_price_irt:
                 trans.is_checked = True
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction total price is not match"
+                trans.processed_at = now_ts
                 trans.save()
                 Wallet.objects.create(
                     customer=customer,
@@ -365,7 +372,7 @@ def process_sell_transactions():
                 logger.warning(
                     f"[task=process_sell] Transaction REJECTED — price mismatch | "
                     f"transaction_id={trans.id} customer_id={customer.id} "
-                    f"expected={transaction_total_price} got={trans.total_price_irt} "
+                    f"expected={transaction_total_price['total']} got={trans.total_price_irt} "
                     f"refund={wallet_amount}g XAU"
                 )
                 transaction.on_commit(lambda: transaction_processed.send(
@@ -377,6 +384,7 @@ def process_sell_transactions():
                 trans.is_checked = True
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction amount is not match"
+                trans.processed_at = now_ts
                 trans.save()
                 Wallet.objects.create(
                     customer=customer,
@@ -403,6 +411,7 @@ def process_sell_transactions():
                 trans.is_checked = True
                 trans.status = Transaction.TRANSACTIONSTATUSES[2][0]
                 trans.reject_reason = "Transaction unit price is not match with last price"
+                trans.processed_at = now_ts
                 trans.save()
                 Wallet.objects.create(
                     customer=customer,
@@ -459,14 +468,14 @@ def process_sell_transactions():
                 withdrawal = SettlementService.create_withdrawal_request(
                     customer=customer,
                     card=trans.card,
-                    amount=transaction_total_price,
+                    amount=trans.total_price_irt,
                     method='پایا',
                     remaining_wallet_amount=customer_irt_balance
                 )
                 logger.info(
                     f"[task=process_sell] Withdrawal request created for bank settlement | "
                     f"transaction_id={trans.id} withdrawal_id={withdrawal.id} "
-                    f"customer_id={customer.id} amount={transaction_total_price}IRT"
+                    f"customer_id={customer.id} amount={trans.total_price_irt}IRT"
                 )
                 try:
                     process_withdrawal_requests.apply_async(
@@ -478,4 +487,7 @@ def process_sell_transactions():
                         f"[task=process_sell] Failed to queue withdrawal task | "
                         f"transaction_id={trans.id} withdrawal_id={withdrawal.id} error={e}"
                     )
-                    continue
+                transaction.on_commit(lambda: transaction_processed.send(
+                    sender='exchange', transaction_id=trans.id, status=trans.status)
+                )
+                continue
