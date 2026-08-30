@@ -1,20 +1,18 @@
+import ipaddress
 import pyotp
-import urllib
+
 
 def get_client_ip(request):
     # returns client ip address
-
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-
-    if x_forwarded_for: 
-        ip = x_forwarded_for.split(',')[0]
-
-    else: 
-        ip = request.META.get('REMOTE_ADDR')
-
-    ip = urllib.parse.unquote(ip)
-    
-    return ip 
+    ip = (
+        request.META.get('HTTP_X_REAL_IP')
+        or (request.META.get('HTTP_X_FORWARDED_FOR') or '').split(',')[-1].strip()
+        or request.META.get('REMOTE_ADDR', '')
+    )
+    try:
+        return str(ipaddress.ip_address(ip.strip()))
+    except ValueError:
+        return '0.0.0.0' 
 
 
 def generate_totp_secret():
