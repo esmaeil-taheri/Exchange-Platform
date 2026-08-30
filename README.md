@@ -353,11 +353,11 @@ Plus per-gram maintenance fee on top.
 |-------|-----------|
 | `Withdrawal` | `status` (pending → sent_to_bank → completed/failed), `track_id`, `iban`, `wage`, `vandar_status` |
 
-**Settlement lifecycle:**
+**Settlement lifecycle & Reconciliation:**
 1. User requests withdrawal → debit IRT wallet atomically → create `Withdrawal` record
 2. Celery `process_withdrawal_requests` → KYC check → Vandar `create_settlement()`
 3. Vandar responds with `track_id` and settlement ETA
-4. Celery `inquiry_processed_withdrawals` polls Vandar for final status
+4. Celery `inquiry_processed_withdrawals` polls Vandar API for reconciliation — updates bank status, handles Paya batch results, and safely refunds unconfirmed payouts after the safety threshold
 5. On completion → `Withdrawal.status = COMPLETED`
 
 ---
@@ -700,32 +700,27 @@ suite needs no database container.
 
 | Metric | Value |
 |--------|-------|
-| Tests | **194 passed**, 1 skipped |
-| Overall coverage | **70%** (3,491 statements, 436 branches) |
-| Runtime | ~15s |
+| Tests | **269 passed**, 1 skipped |
+| Overall coverage | **82%** (3,639 statements, 456 branches) |
+| Runtime | ~35s |
 
 The skipped test is `TestRealRowLocks`, which needs real `SELECT ... FOR UPDATE`
 blocking — SQLite ignores row locks, so it only runs against PostgreSQL.
 
-### Coverage is uneven — read this before trusting the 70%
-
-Coverage is concentrated in the API layer. The background workers that actually
-move money and gold are close to untested:
+### Coverage by Core & Worker Modules
 
 | Module | Coverage |
 |--------|----------|
-| `payments/services/payments_services.py` | 94% |
+| `core/services/payment/zarrinpal.py` | 100% |
+| `core/services/settlement/vandar.py` | 100% |
+| `customers/tasks/bank_card_tasks.py` | 99% |
 | `exchange/api/views/buy_sell_views.py` | 97% |
-| `settlements/services/settlement_services.py` | 93% |
+| `payments/services/payments_services.py` | 94% |
+| `settlements/services/settlement_services.py` | 94% |
+| `payments/tasks/payment_tasks.py` | 90% |
+| `settlements/tasks/settlement_tasks.py` | 88% |
 | `exchange/services/exchange_services.py` | 79% |
-| `exchange/services/price_services.py` | 52% |
-| `exchange/services/daily_limit_services.py` | 28% |
-| `settlements/tasks/settlement_tasks.py` | 22% |
-| `payments/tasks/payment_tasks.py` | 21% |
-| `exchange/tasks/price_tasks.py` | 20% |
-| **`exchange/tasks/exchange_tasks.py`** | **9%** |
-| `customers/tasks/bank_card_tasks.py` | 0% |
-
+| `exchange/tasks/exchange_tasks.py` | 78% |
 
 ---
 
@@ -797,7 +792,7 @@ All async operations run through Celery. The Beat scheduler manages periodic tas
 | `process_buy_transactions` | Post-buy | Finalize wallet-funded buy orders |
 | `process_sell_transactions` | Post-sell | Settle sell proceeds to IRT or bank |
 | `process_withdrawal_requests` | Post-request | Send withdrawal to Vandar |
-| `inquiry_processed_withdrawals` | Periodic (Beat) | Poll Vandar for settlement status |
+| `inquiry_processed_withdrawals` | Periodic (Beat) | Reconcile Vandar settlement statuses and handle unconfirmed payouts |
 | `check_cards_ownership` | Periodic (Beat) | Batch bank card ownership verification |
 | `complete_verified_cards_information` | Periodic (Beat) | Enrich verified card data |
 | `fetch_asset_price` | Periodic (Beat) | Pull latest XAU18 price from feed |
