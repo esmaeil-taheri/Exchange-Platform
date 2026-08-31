@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
 from celery import shared_task
 from django.utils import timezone
@@ -73,9 +73,14 @@ def process_buy_invoice_task(self, invoice_id):
                 )
                 return f"Invoice {invoice_id} already processed"
 
+            # The invoice does not store the quoted gold amount, so it is rebuilt
+            # here by inverting the quote. PriceService rounds gold_price_toman
+            # with ROUND_HALF_UP, so this division must use ROUND_HALF_UP too —
+            # ROUND_DOWN loses 0.0001g whenever that rounding went down, and the
+            # buy worker then rejects the transaction on an exact total mismatch.
             total_price = invoice.total_price - (invoice.fee + invoice.maintenance_fee)
             gold_amount = (Decimal(str(total_price)) / Decimal(str(invoice.unit_price))).quantize(
-                Decimal("0.0001"), rounding=ROUND_DOWN
+                Decimal("0.0001"), rounding=ROUND_HALF_UP
             )
 
             txn = Transaction.objects.create(

@@ -64,12 +64,51 @@ class TestHandleZarinpalCallback:
         result = PaymentService.handle_zarinpal_callback(AUTHORITY, self._make_request())
         assert 'قبلاً' in result['message'] or 'paid' in result['message'].lower()
 
-    def test_verify_101_returns_idempotent_message(
+    def test_verify_101_marks_invoice_rejected_for_manual_review(
         self, invoice, mock_gateway_verify_101
     ):
+        """
+        Code 101 means Zarinpal already captured the money but our side never
+        finalized it — the crash window between verify and commit. It used to
+        return a message and change nothing, leaving the invoice pending
+        forever, invisible to every safety net and to support.
+        """
         result = PaymentService.handle_zarinpal_callback(AUTHORITY, self._make_request())
-        assert result is not None
-        assert 'message' in result
+
+        invoice.refresh_from_db()
+        assert invoice.status == Invoice.STATUS_CHOICES[3][0]  # rejected
+        assert 'zarinpal_101' in invoice.gateway_response
+        assert str(invoice.id) in result['message']
+        assert 'پشتیبانی' in result['message']
+
+    def test_verify_101_never_marks_the_invoice_paid(
+        self, buy_invoice, mocker
+    ):
+        """
+        The card-ownership rule cannot be checked on 101 (verify returns only
+        the code, never the card data), so the invoice must not become claimable
+        by process_stuck_invoices — that task claims on is_paid=True and would
+        deliver the gold with no card check at all.
+        """
+        mocker.patch(
+            'apps.payments.services.payments_services.PaymentService.gateway.verify_payment',
+            return_value=101,
+        )
+        queue_buy = mocker.patch(
+            'apps.payments.services.payments_services.process_buy_invoice_task.apply_async'
+        )
+
+        PaymentService.handle_zarinpal_callback(
+            buy_invoice.gateway_track_id, self._make_request()
+        )
+
+        buy_invoice.refresh_from_db()
+        assert buy_invoice.is_paid is False
+        assert buy_invoice.is_processed is False
+        queue_buy.assert_not_called()
+        assert not Invoice.objects.filter(
+            id=buy_invoice.id, is_paid=True, is_processed=False
+        ).exists()
 
     def test_verify_102_marks_invoice_as_failed(
         self, invoice, mock_gateway_verify_102

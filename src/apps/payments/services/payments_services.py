@@ -110,7 +110,43 @@ class PaymentService:
         )
 
         if verification_result == 101:
-            return {'message': 'این فاکتور قبلاً پرداخت شده است'}
+            # 101 means Zarinpal already verified this payment, so the money is
+            # captured. Reaching here means it was captured but never finalized
+            # on our side — get_invoice_by_authority only returns pending
+            # invoices. That is the crash window between the verify call above
+            # and the commit further down (deploy, worker restart, OOM).
+            #
+            # verify_payment returns only the code on 101, never the card data,
+            # so the card-ownership rule cannot be checked. Rejecting is
+            # therefore the only safe outcome, and it must be loud: this is the
+            # one state in the system where money is held pending a human.
+            # is_paid deliberately stays False — process_stuck_invoices claims
+            # on is_paid=True and would deliver the gold with no card check.
+            with transaction.atomic():
+                invoice = PaymentsSelectors.get_invoice_by_id_for_update(
+                    invoice_id=invoice.id
+                )
+
+                if invoice.is_paid:
+                    return {'message': 'این فاکتور قبلاً پرداخت شده است'}
+
+                invoice.status = Invoice.STATUS_CHOICES[3][0]  # rejected
+                invoice.gateway_response = (
+                    'zarinpal_101_already_verified — captured but not finalized'
+                )
+                invoice.save(update_fields=['status', 'gateway_response'])
+
+            logger.error(
+                f"Payment captured but not finalized — needs manual review | "
+                f"invoice_id={invoice.id} customer_id={invoice.customer_id} "
+                f"authority={gateway_track_id} amount={invoice.total_price}IRT"
+            )
+            return {
+                'message': (
+                    f'پرداخت شما ثبت شده اما نیاز به بررسی دارد. '
+                    f'لطفاً با پشتیبانی تماس بگیرید — شماره پیگیری: {invoice.id}'
+                )
+            }
         
         if verification_result == 102:
 
