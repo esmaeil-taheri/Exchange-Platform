@@ -61,7 +61,7 @@ class TestProcessBuyTransactions:
         assert trans.is_checked is True
         assert trans.processed_at is not None
 
-        xau_balance = WalletSelector.get_user_balance_for_update(
+        xau_balance = WalletSelector.get_user_balance_under_customer_lock(
             user_id=customer.user.id,
             wallet_type=Wallet.WALLETTYPES[1][0],
         )
@@ -110,7 +110,7 @@ class TestProcessBuyTransactions:
         assert trans.status == Transaction.TRANSACTIONSTATUSES[1][0]
         assert trans.is_checked is True
 
-        xau_balance = WalletSelector.get_user_balance_for_update(
+        xau_balance = WalletSelector.get_user_balance_under_customer_lock(
             user_id=customer.user.id,
             wallet_type=Wallet.WALLETTYPES[1][0],
         )
@@ -316,7 +316,7 @@ class TestProcessSellTransactions:
         assert trans.is_checked is True
         assert trans.processed_at is not None
 
-        irt_balance = WalletSelector.get_user_balance_for_update(
+        irt_balance = WalletSelector.get_user_balance_under_customer_lock(
             user_id=customer.user.id,
             wallet_type=Wallet.WALLETTYPES[0][0],
         )

@@ -166,7 +166,7 @@ class ExchangeService:
                     )
                     raise InsufficientSystemBalance('میزان درخواستی بیشتر از موجودی فعلی است')
 
-                user_wallet_balance = WalletSelector.get_user_balance_for_update(
+                user_wallet_balance = WalletSelector.get_user_balance_under_customer_lock(
                     user_id=user_id, wallet_type='irt'
                 )
 
@@ -356,7 +356,7 @@ class ExchangeService:
                 asset=asset,
             )
 
-            user_wallet_balance = WalletSelector.get_user_balance_for_update(
+            user_wallet_balance = WalletSelector.get_user_balance_under_customer_lock(
                 user_id=user_id, wallet_type='xau'
             )
 

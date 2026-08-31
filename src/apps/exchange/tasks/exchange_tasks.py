@@ -116,7 +116,7 @@ def process_buy_transactions():
                 )
                 continue
 
-            customer_irt_balance = WalletSelector.get_user_balance_for_update(
+            customer_irt_balance = WalletSelector.get_user_balance_under_customer_lock(
                 user_id=customer.user.id,
                 wallet_type=Wallet.WALLETTYPES[0][0]
             )
@@ -334,7 +334,7 @@ def process_sell_transactions():
                 )
                 continue
 
-            customer_xau_balance = WalletSelector.get_user_balance_for_update(
+            customer_xau_balance = WalletSelector.get_user_balance_under_customer_lock(
                 user_id=customer.user.id,
                 wallet_type=Wallet.WALLETTYPES[1][0]
             )
@@ -461,7 +461,7 @@ def process_sell_transactions():
                 continue
 
             if trans.withdraw_method == Transaction.WITHDRAWTYPES[1][0]:  # Bank
-                customer_irt_balance = WalletSelector.get_user_balance_for_update(
+                customer_irt_balance = WalletSelector.get_user_balance_under_customer_lock(
                     user_id=customer.user.id,
                     wallet_type=Wallet.WALLETTYPES[0][0]
                 )

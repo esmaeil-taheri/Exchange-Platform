@@ -59,7 +59,7 @@ class SettlementService:
                 card_id=card_id, customer_id=customer.id
             )
 
-            user_wallet_balance = WalletSelector.get_user_balance_for_update(
+            user_wallet_balance = WalletSelector.get_user_balance_under_customer_lock(
                 user_id=user_id, wallet_type='irt'
             )
 

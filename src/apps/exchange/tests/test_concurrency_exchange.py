@@ -19,6 +19,9 @@ from unittest.mock import MagicMock
 from django.db import connection, connections
 
 from apps.exchange.services.exchange_services import ExchangeService
+from apps.exchange.selectors.wallet_selectors import WalletSelector
+from apps.settlements.services.settlement_services import SettlementService
+from apps.settlements.models.withdrawal import Withdrawal
 from apps.exchange.models.transaction import Transaction
 from apps.payments.models.invoice import Invoice
 from apps.core.exceptions.base import ActionDisabled
@@ -129,3 +132,59 @@ class TestRealRowLocks:
             customer=authenticated_customer, status='pending'
         ).count() == 1
         assert errors == ['ActionDisabled']
+
+    def test_concurrent_withdrawals_cannot_overdraw_the_irt_wallet(
+        self, user, authenticated_customer, irt_wallet, bank_card, mocker
+    ):
+        """
+        WalletSelector.get_user_balance_under_customer_lock does not lock — the
+        `select_for_update()` it used to carry was dropped by Django's aggregate
+        path, so the emitted SQL is a plain SELECT SUM(...). What actually
+        prevents an overdraft is the Customer row lock that every debit path
+        holds across both the balance check and the debit.
+
+        Two simultaneous withdrawals isolate exactly that guarantee: unlike two
+        buys, nothing else serializes them — there is no pending-transaction
+        rule on this path. Each asks for 70% of the balance. Serialized, one
+        succeeds and the other is rejected. Unserialized, both read the same
+        balance, both pass their check, and the ledger goes negative.
+        """
+        mocker.patch(
+            'apps.settlements.services.settlement_services.'
+            'process_withdrawal_requests.apply_async',
+            return_value=None,
+        )
+
+        balance = WalletSelector.get_user_balance_under_customer_lock(
+            user_id=user.id, wallet_type='irt'
+        )
+        each = int(balance * Decimal('0.7'))
+        assert each * 2 > balance, 'test is meaningless unless the two overlap'
+
+        errors = []
+        barrier = threading.Barrier(2)
+
+        def withdraw():
+            try:
+                barrier.wait()
+                SettlementService.initiate_withdrawal_request(
+                    each, bank_card.id, _make_request(user)
+                )
+            except Exception as exc:
+                errors.append(type(exc).__name__)
+            finally:
+                for conn in connections.all():
+                    conn.close()
+
+        threads = [threading.Thread(target=withdraw) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        final = WalletSelector.get_user_balance_under_customer_lock(
+            user_id=user.id, wallet_type='irt'
+        )
+        assert final >= 0, f'IRT wallet overdrawn to {final}'
+        assert Withdrawal.objects.filter(customer=authenticated_customer).count() == 1
+        assert errors == ['InsufficientUserBalance']

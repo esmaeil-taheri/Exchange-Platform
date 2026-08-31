@@ -75,7 +75,7 @@ def bank_card(customer, db):
 def irt_wallet(customer, db):
     """
     A single verified IRT wallet entry giving the customer WALLET_BALANCE.
-    WalletSelector.get_user_balance_for_update aggregates amount across all
+    WalletSelector.get_user_balance_under_customer_lock aggregates amount across all
     verified IRT wallet rows, so one row is enough.
     """
     ts = get_date_time()['timestamp']
