@@ -566,6 +566,28 @@ Layer 4: IP Tracking — Every transaction records client IP
 | `settings/dev.py` | Debug=True, mock payment gateway |
 | `settings/prod.py` | Debug=False, real gateway, stricter security |
 
+### CI/CD (GitHub Actions)
+
+**CI** — every push to `main` and every pull request:
+
+| Job | What it guards |
+|-----|----------------|
+| `lint` | `ruff check` + `ruff format --check` |
+| `test-sqlite` | Full suite + coverage report artifact |
+| `test-postgres` | Real migration chain and real `SELECT FOR UPDATE` — runs the concurrency tests SQLite skips |
+| `django-checks` | `makemigrations --check` (migration drift) + `check --deploy` |
+| `docker-build` | Production image still builds |
+
+**CD** — on `git tag v*.*.*` (or manual dispatch):
+
+```
+build → push to GHCR → SSH to server → migrate + collectstatic
+      → docker compose up -d → health gate (deploy fails if /metrics never answers)
+```
+
+Deploys are serialized by the `cd-production` concurrency group. Adding a *Required
+reviewer* to the `production` environment gates each release behind manual approval.
+
 ---
 
 ## 🚀 Getting Started
