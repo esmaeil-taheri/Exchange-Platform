@@ -24,10 +24,32 @@ from apps.exchange.exceptions.exchange_exceptions import InsufficientSystemBalan
 from apps.core.exceptions.celery_exceptions import CeleryDispatchError
 from apps.core.exceptions.inquiry_exceptions import InquiryServiceError, KycInquiryFailed
 from apps.core.exceptions.rate_limit_exceptions import RateLimitExceeded
+from apps.core.exceptions.idempotency_exceptions import (
+    IdempotencyKeyRequired,
+    InvalidIdempotencyKey,
+    IdempotencyKeyConflict,
+    IdempotentRequestInProgress,
+)
 from apps.payments.exceptions.payments_exceptions import InvoiceNotFound
 
 
 def custom_exception_handler(exc, context):
+
+    if isinstance(exc, IdempotentRequestInProgress):
+        # 409 with Retry-After: the first attempt is still deciding. The client
+        # must retry the SAME key rather than starting a new operation.
+        response = _error_response(exc, status.HTTP_409_CONFLICT)
+        response['Retry-After'] = str(getattr(exc, 'retry_after', 3))
+        return response
+
+    if isinstance(exc, IdempotencyKeyConflict):
+        # 422, never a replay: the client reused one key for two different
+        # requests, and hiding the second behind the first response would turn
+        # a client bug into a silently dropped financial operation.
+        return _error_response(exc, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    if isinstance(exc, (IdempotencyKeyRequired, InvalidIdempotencyKey)):
+        return _error_response(exc, status.HTTP_400_BAD_REQUEST)
 
     if isinstance(exc, RateLimitExceeded):
         response = _error_response(exc, status.HTTP_429_TOO_MANY_REQUESTS)

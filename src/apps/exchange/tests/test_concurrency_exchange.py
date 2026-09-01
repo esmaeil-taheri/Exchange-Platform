@@ -23,6 +23,8 @@ from apps.exchange.selectors.wallet_selectors import WalletSelector
 from apps.settlements.services.settlement_services import SettlementService
 from apps.settlements.models.withdrawal import Withdrawal
 from apps.exchange.models.transaction import Transaction
+from apps.exchange.models.wallet import Wallet
+from apps.core.models.idempotency import IdempotencyRecord
 from apps.payments.models.invoice import Invoice
 from apps.core.exceptions.base import ActionDisabled
 
@@ -188,3 +190,64 @@ class TestRealRowLocks:
         assert final >= 0, f'IRT wallet overdrawn to {final}'
         assert Withdrawal.objects.filter(customer=authenticated_customer).count() == 1
         assert errors == ['InsufficientUserBalance']
+
+    def test_simultaneous_sells_sharing_one_idempotency_key_settle_once(
+        self, user, authenticated_customer, currency, price_log,
+        daily_limit, site_settings, xau_wallet
+    ):
+        """
+        Two requests fire at once carrying the same key — the double-submit a
+        retrying mobile client actually produces.
+
+        Nothing in the application layer arbitrates this. The loser of the
+        INSERT blocks on the unique index until the winner commits, then reads
+        the committed row and replays it. That is the whole mechanism, and it
+        is why the resolution is a unique constraint rather than an
+        `if exists()` — a check-then-insert has a window here, and this test
+        would land in it.
+
+        Note what the loser does NOT hit: the pending-transaction guard. It
+        never reaches the customer lock, because the key is claimed first.
+        """
+        results = []
+        errors = []
+        barrier = threading.Barrier(2)
+        key = 'c0ffee00-dead-4bee-8fad-0123456789ab'
+
+        def sell():
+            try:
+                barrier.wait()
+                results.append(
+                    ExchangeService.sell_asset(
+                        _make_request(user), 'XAU18', Decimal('0.0500'), False,
+                        idempotency_key=key,
+                    )
+                )
+            except Exception as exc:
+                errors.append(type(exc).__name__)
+            finally:
+                for conn in connections.all():
+                    conn.close()
+
+        threads = [threading.Thread(target=sell) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == [], f'no request should fail, got {errors}'
+        assert len(results) == 2
+        assert results[0] == results[1], 'both callers must get the same answer'
+
+        assert Transaction.objects.filter(
+            customer=authenticated_customer, transaction_type='sell'
+        ).count() == 1
+        assert Wallet.objects.filter(
+            customer=authenticated_customer, wallet_type='xau', amount__lt=0
+        ).count() == 1
+        assert IdempotencyRecord.objects.filter(key=key).count() == 1
+
+        final = WalletSelector.get_user_balance_under_customer_lock(
+            user_id=user.id, wallet_type='xau'
+        )
+        assert final == Decimal('1.0000') - Decimal('0.0500')

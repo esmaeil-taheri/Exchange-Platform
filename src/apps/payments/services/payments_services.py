@@ -6,6 +6,8 @@ from apps.payments.models.invoice import Invoice
 from apps.payments.exceptions.payments_exceptions import InvoiceNotFound
 from apps.customers.models.bank_card import BankCard
 from apps.payments.tasks.payment_tasks import process_buy_invoice_task, process_deposit_invoice_task
+from apps.core.models.idempotency import IdempotencyRecord
+from apps.core.services.idempotency import IdempotencyService
 
 import hashlib
 
@@ -273,7 +275,9 @@ class PaymentService:
             return {'message': message}
         
     @staticmethod
-    def initiate_deposit(amount: int, request) -> dict:
+    def initiate_deposit(
+        amount: int, request, idempotency_key: str | None = None
+    ) -> dict:
         """
         Initiate a deposit transaction for the user.
 
@@ -285,17 +289,39 @@ class PaymentService:
             dict: Contains authority and payment_link for the deposit
         """
         customer = request.user.customer_profile
+        user_id = request.user.id
 
         logger.info(
             f"Deposit request received | customer_id={customer.id} "
-            f"user_id={request.user.id} amount={amount}IRT"
+            f"user_id={user_id} amount={amount}IRT"
         )
-        
-        invoice = PaymentService.create_invoice(
-            customer=customer,
-            total_price=amount,
-            invoice_type=Invoice.INVOICE_TYPES[0][0]  # deposit
-        )
+
+        # external=True: the gateway call below must stay outside a transaction,
+        # so the claim commits first and the response is recorded afterwards.
+        # The effect guarded here is an unpaid invoice — money only moves later,
+        # in the callback, which has its own idempotency on the invoice row.
+        with transaction.atomic():
+            guard = IdempotencyService.acquire(
+                user_id=user_id,
+                endpoint=IdempotencyRecord.Endpoint.DEPOSIT,
+                key=idempotency_key,
+                params={'amount': amount},
+                external=True,
+            )
+            if guard.replayed:
+                logger.info(
+                    f"Deposit replayed from idempotency key | user_id={user_id} "
+                    f"reference={guard.record.reference or '-'}"
+                )
+                return guard.response
+
+            invoice = PaymentService.create_invoice(
+                customer=customer,
+                total_price=amount,
+                invoice_type=Invoice.INVOICE_TYPES[0][0]  # deposit
+            )
+            guard.set_reference(f'invoice:{invoice.id}')
+
         try:
             payment_data = PaymentService.create_payment_gateway_link(
                 amount=amount,
@@ -311,16 +337,20 @@ class PaymentService:
                 f"customer_id={customer.id} amount={amount}IRT"
             )
 
+            # Unpayable invoice: free the key so the retry gets a fresh one.
+            guard.release()
             raise
 
         authority = payment_data['authority']
         payment_link = payment_data['payment_link']
 
-        invoice.payment_gateway = 'zari'
-        invoice.gateway_track_id = authority
+        result = {'message': payment_link}
 
-        invoice.save(update_fields=['payment_gateway', 'gateway_track_id'])
-
+        with transaction.atomic():
+            invoice.payment_gateway = 'zari'
+            invoice.gateway_track_id = authority
+            invoice.save(update_fields=['payment_gateway', 'gateway_track_id'])
+            guard.complete(result, reference=f'invoice:{invoice.id}')
 
         logger.info(
             f"Payment gateway created | invoice_id={invoice.id} "
@@ -328,6 +358,5 @@ class PaymentService:
             f"amount={amount}IRT gateway=zari"
         )
 
-
-        return {'message': payment_link}
+        return result
 

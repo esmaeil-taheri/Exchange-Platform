@@ -14,6 +14,7 @@ from apps.exchange.api.serializers.buy_sell_serializers import BuySerializer, IR
 from apps.exchange.selectors.wallet_selectors import WalletSelector
 from apps.core.pagination import StandardResultsSetPagination
 from apps.exchange.selectors.transaction_selectors import TransactionSelector
+from apps.core.utils.openapi_params import IDEMPOTENCY_KEY_PARAMETER
 
 
 class GetBalanceApiView(APIView):
@@ -91,6 +92,7 @@ class BuyApiView(APIView):
         summary="Buy Asset",
         tags=['Exchange'],
         request=BuySerializer,
+        parameters=[IDEMPOTENCY_KEY_PARAMETER],
         responses={
             201: OpenApiResponse(
 
@@ -228,6 +230,7 @@ class SellApiView(APIView):
         summary="Sell Asset",
         tags=['Exchange'],
         request=SellSerializer,
+        parameters=[IDEMPOTENCY_KEY_PARAMETER],
         responses={
             201: OpenApiResponse(
 

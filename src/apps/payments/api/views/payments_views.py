@@ -8,6 +8,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from apps.payments.api.serializers.payments_serializers import BaseMessageSerializer, DepositSerializer, ZarinpalCallbackSerializer
 from apps.core.exceptions.open_api import ErrorSerializer
 from apps.core.decorators.rate_limit import rate_limit
+from apps.core.utils.openapi_params import IDEMPOTENCY_KEY_PARAMETER
 
 
 class ZarinpalCallbackApiView(APIView):
@@ -58,6 +59,7 @@ class DepositApiView(APIView):
         tags=['Payments'],
         description="Endpoint used to deposit funds into the user's account.",
         request=DepositSerializer,
+        parameters=[IDEMPOTENCY_KEY_PARAMETER],
         responses={
             200: OpenApiResponse(
                 response=BaseMessageSerializer,

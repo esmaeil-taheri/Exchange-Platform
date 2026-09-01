@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.payments.services.payments_services import PaymentService
+from apps.core.utils.idempotency_utils import extract_idempotency_key
 
 
 class BaseMessageSerializer(serializers.Serializer):
@@ -26,7 +27,11 @@ class DepositSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-        return PaymentService.initiate_deposit(validated_data['amount'], request)
+        return PaymentService.initiate_deposit(
+            validated_data['amount'],
+            request,
+            idempotency_key=extract_idempotency_key(request),
+        )
 
 
     def validate(self, validated_data):

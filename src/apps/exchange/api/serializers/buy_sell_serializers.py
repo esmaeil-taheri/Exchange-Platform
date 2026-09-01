@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.exchange.services.exchange_services import ExchangeService
 from apps.exchange.models.transaction import Transaction
+from apps.core.utils.idempotency_utils import extract_idempotency_key
 
 
 class BuySerializer(serializers.Serializer):
@@ -18,11 +19,13 @@ class BuySerializer(serializers.Serializer):
 
 
     def create(self, validated_data):
+        request = self.context['request']
         return ExchangeService.buy_asset(
-            request=self.context['request'],
+            request=request,
             asset=validated_data['aseet'],
             amount=validated_data['amount'],
-            buy_from_wallet=validated_data['buy_from_wallet']
+            buy_from_wallet=validated_data['buy_from_wallet'],
+            idempotency_key=extract_idempotency_key(request),
         )
 
 
@@ -71,12 +74,14 @@ class SellSerializer(serializers.Serializer):
     bank_card_id = serializers.IntegerField(required=False)
 
     def create(self, validated_data):
+        request = self.context['request']
         return ExchangeService.sell_asset(
-            request=self.context['request'],
+            request=request,
             asset=validated_data['aseet'],
             amount=validated_data['amount'],
             card_withdaraw=validated_data['card_withdaraw'],
-            bank_card_id=validated_data.get('bank_card_id')
+            bank_card_id=validated_data.get('bank_card_id'),
+            idempotency_key=extract_idempotency_key(request),
         )
     
     def validate(self, attrs):

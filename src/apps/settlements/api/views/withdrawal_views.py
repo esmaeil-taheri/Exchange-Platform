@@ -14,6 +14,7 @@ from apps.customers.api.permissions.customer_permisions import IsCustomerAuthent
 from apps.core.pagination import StandardResultsSetPagination
 from apps.core.exceptions.open_api import ErrorSerializer
 from apps.core.decorators.rate_limit import rate_limit
+from apps.core.utils.openapi_params import IDEMPOTENCY_KEY_PARAMETER
 
 
 @extend_schema_view(
@@ -157,6 +158,7 @@ class CreateWithdrawalRequest(APIView):
         tags=['Settlements'],
         description="Create a new withdrawal request for the authenticated customer.",
         request=WithdrawSerializer,
+        parameters=[IDEMPOTENCY_KEY_PARAMETER],
         responses={
             201: OpenApiResponse(
                 response=WithdrawalBaseMessageSerializer,

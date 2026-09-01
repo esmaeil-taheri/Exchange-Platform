@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_prometheus",
 
+    "apps.core.apps.CoreConfig",
     "apps.accounts.apps.AccountsConfig",
     "apps.site_setting.apps.SiteSettingConfig",
     "apps.customers.apps.CustomersConfig",
@@ -281,6 +282,23 @@ CELERY_RESULT_BACKEND = config('CELERY_BROKER_URL')
 ZARINPAL_MERCHANT_KEY = config('ZARINPAL_MERCHANT_KEY')
 ZARINPAL_CALLBACK_URL = config('ZARINPAL_CALLBACK_URL')
 
+
+# ─── Idempotency ────────────────────────────────────────────────────────────
+# Flip to True once every client sends an Idempotency-Key on the financial
+# endpoints. Until then the header is honoured when present and the endpoints
+# behave exactly as before when it is absent — which means the protection is
+# only real for clients that opted in.
+IDEMPOTENCY_REQUIRED = config('IDEMPOTENCY_REQUIRED', default=False, cast=bool)
+
+# How long a stored response stays replayable. Long enough to cover a mobile
+# client that resumes hours later.
+IDEMPOTENCY_RETENTION_HOURS = config(
+    'IDEMPOTENCY_RETENTION_HOURS', default=48, cast=int)
+
+# After this, an IN_PROGRESS claim left behind by a crashed gateway request is
+# reclaimable. Only the external-gateway paths can ever commit that state.
+IDEMPOTENCY_IN_PROGRESS_TIMEOUT_SECONDS = config(
+    'IDEMPOTENCY_IN_PROGRESS_TIMEOUT_SECONDS', default=120, cast=int)
 
 # Settlements
 VANDAR_API_KEY = config('VANDAR_API_KEY')

@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema_field
 
 from apps.settlements.models.withdrawal import Withdrawal
 from apps.settlements.services.settlement_services import SettlementService
+from apps.core.utils.idempotency_utils import extract_idempotency_key
 
 
 class WithdrawalBaseMessageSerializer(serializers.Serializer):
@@ -64,9 +65,10 @@ class WithdrawSerializer(serializers.Serializer):
     def create(self, validated_data):
         request = self.context.get('request')
         return SettlementService.initiate_withdrawal_request(
-            validated_data['amount'], 
+            validated_data['amount'],
             validated_data['card_id'],
-            request
+            request,
+            idempotency_key=extract_idempotency_key(request),
         )
 
     def validate(self, validated_data):

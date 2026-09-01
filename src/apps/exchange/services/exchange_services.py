@@ -18,6 +18,8 @@ from apps.exchange.services.wallet_service import WalletService
 from apps.exchange.selectors.transaction_selectors import TransactionSelector
 from apps.payments.services.payments_services import PaymentService
 from apps.customers.selectors.bank_card_selectors import BankCardSelectors
+from apps.core.models.idempotency import IdempotencyRecord
+from apps.core.services.idempotency import IdempotencyService
 
 from .price_services import PriceService
 from apps.core.utils.logger import get_logger
@@ -61,7 +63,10 @@ class ExchangeService:
         return customer
 
     @staticmethod
-    def buy_asset(request, asset: str, amount: int, buy_from_wallet: bool) -> dict:
+    def buy_asset(
+        request, asset: str, amount: int, buy_from_wallet: bool,
+        idempotency_key: str | None = None,
+    ) -> dict:
         """
         Handles user-initiated gold purchase requests and creates a pending buy transaction.
 
@@ -149,6 +154,28 @@ class ExchangeService:
 
             with transaction.atomic():
 
+                # Claimed first, inside the same transaction as every write
+                # below. Claim and effect therefore commit together: a crash
+                # anywhere in this block rolls back both, correctly leaving the
+                # key free for a genuine retry, and a duplicate that arrives
+                # after this commits replays instead of buying again.
+                guard = IdempotencyService.acquire(
+                    user_id=user_id,
+                    endpoint=IdempotencyRecord.Endpoint.BUY,
+                    key=idempotency_key,
+                    params={
+                        'asset': asset,
+                        'amount': amount,
+                        'buy_from_wallet': True,
+                    },
+                )
+                if guard.replayed:
+                    logger.info(
+                        f"Buy replayed from idempotency key | user_id={user_id} "
+                        f"asset={asset} reference={guard.record.reference or '-'}"
+                    )
+                    return guard.response
+
                 customer = ExchangeService._lock_customer_and_validate(
                     user_id=user_id,
                     currency=currency,
@@ -186,7 +213,7 @@ class ExchangeService:
                     timestamp=timestamp
                 )
 
-                TransactionService.create_buy_transaction(
+                buy_transaction = TransactionService.create_buy_transaction(
                     customer=customer,
                     currency=currency,
                     wallet=wallet_entry,
@@ -196,12 +223,16 @@ class ExchangeService:
                     timestamp=timestamp
                 )
 
+                result = {'message': 'درخواست خرید با موفقیت ثبت شد'}
+                guard.complete(
+                    result, reference=f'transaction:{buy_transaction.id}')
+
             logger.info(
                 f"Buy order registered (wallet) | user_id={user_id} asset={asset} "
                 f"gold={calculated_price['data']['gold_amount']}g "
                 f"total={calculated_price['data']['total_amount']}IRT"
             )
-            return {'message': 'درخواست خرید با موفقیت ثبت شد'}
+            return result
 
         if not buy_from_wallet:
 
@@ -225,6 +256,29 @@ class ExchangeService:
             # block: holding the customer lock during a slow HTTP call would
             # block every other financial operation of this customer.
             with transaction.atomic():
+                # external=True: unlike the wallet branch, this claim has to
+                # commit before the work finishes, because the gateway call
+                # below must not run inside a transaction. A crash between the
+                # two leaves the key IN_PROGRESS guarding an unpaid invoice —
+                # released on the error path, reclaimable once stale.
+                guard = IdempotencyService.acquire(
+                    user_id=user_id,
+                    endpoint=IdempotencyRecord.Endpoint.BUY,
+                    key=idempotency_key,
+                    params={
+                        'asset': asset,
+                        'amount': amount,
+                        'buy_from_wallet': False,
+                    },
+                    external=True,
+                )
+                if guard.replayed:
+                    logger.info(
+                        f"Buy replayed from idempotency key | user_id={user_id} "
+                        f"asset={asset} reference={guard.record.reference or '-'}"
+                    )
+                    return guard.response
+
                 customer = ExchangeService._lock_customer_and_validate(
                     user_id=user_id,
                     currency=currency,
@@ -240,6 +294,7 @@ class ExchangeService:
                     fee=calculated_price['data']['fee_toman'],
                     maintenance_fee=calculated_price['data']['maintenance_fee'],
                 )
+                guard.set_reference(f'invoice:{invoice.id}')
 
             try:
                 payment_data = PaymentService.create_payment_gateway_link(
@@ -254,23 +309,35 @@ class ExchangeService:
                 invoice.gateway_response = "gateway_failed"
                 invoice.status = "failed"
                 invoice.save(update_fields=["gateway_response", "status"])
+                # This invoice can never be paid, so the key must not stay
+                # claimed — the customer's retry needs a fresh, payable one.
+                guard.release()
                 raise
 
             authority = payment_data['authority']
             payment_link = payment_data['payment_link']
 
-            invoice.payment_gateway = 'zari'
-            invoice.gateway_track_id = authority
-            invoice.save(update_fields=['payment_gateway', 'gateway_track_id'])
+            result = {'message': payment_link}
+
+            with transaction.atomic():
+                invoice.payment_gateway = 'zari'
+                invoice.gateway_track_id = authority
+                invoice.save(update_fields=['payment_gateway', 'gateway_track_id'])
+                # Same transaction as the authority: a retry must never replay a
+                # link for an invoice whose authority was not committed.
+                guard.complete(result, reference=f'invoice:{invoice.id}')
 
             logger.info(
                 f"Buy order gateway invoice created | user_id={user_id} asset={asset} "
                 f"invoice_id={invoice.id} amount={total_amount}IRT authority={authority}"
             )
-            return {'message': payment_link}
+            return result
         
     @staticmethod
-    def sell_asset(request, asset: str, amount: Decimal, card_withdaraw: bool, bank_card_id: int = None) -> dict:
+    def sell_asset(
+        request, asset: str, amount: Decimal, card_withdaraw: bool,
+        bank_card_id: int = None, idempotency_key: str | None = None,
+    ) -> dict:
         """
         Submit a sell order for a gold-based asset on behalf of the authenticated user.
 
@@ -336,17 +403,40 @@ class ExchangeService:
             logger.warning(f"Sell blocked — currency disabled | user_id={user_id} asset={asset}")
             raise CurrencyNotBuyable("در حال حاضر امکان فروش وجود ندارد")
 
-        calculated_price = PriceService.calculate_xau18_currency_price(
-            unit='XAU18',
-            amount=amount,
-            transaction_type='sell'
-        )
-
         withdraw_method = 'wallet'
         customer_ip = get_client_ip(request)
         timestamp = get_date_time()['timestamp']
 
         with transaction.atomic():
+
+            # Claimed before the order is priced and before the customer lock
+            # is taken, so a replay costs one indexed read and returns the
+            # original answer rather than re-quoting at today's price. The
+            # claim shares this transaction with the gold debit below, so the
+            # two can never exist apart.
+            guard = IdempotencyService.acquire(
+                user_id=user_id,
+                endpoint=IdempotencyRecord.Endpoint.SELL,
+                key=idempotency_key,
+                params={
+                    'asset': asset,
+                    'amount': amount,
+                    'card_withdaraw': card_withdaraw,
+                    'bank_card_id': bank_card_id,
+                },
+            )
+            if guard.replayed:
+                logger.info(
+                    f"Sell replayed from idempotency key | user_id={user_id} "
+                    f"asset={asset} reference={guard.record.reference or '-'}"
+                )
+                return guard.response
+
+            calculated_price = PriceService.calculate_xau18_currency_price(
+                unit='XAU18',
+                amount=amount,
+                transaction_type='sell'
+            )
 
             customer = ExchangeService._lock_customer_and_validate(
                 user_id=user_id,
@@ -383,7 +473,7 @@ class ExchangeService:
                 timestamp=timestamp
             )
 
-            TransactionService.create_sell_transaction(
+            sell_transaction = TransactionService.create_sell_transaction(
                 customer=customer,
                 currency=currency,
                 wallet=wallet_entry,
@@ -394,10 +484,13 @@ class ExchangeService:
                 timestamp=timestamp
             )
 
+            result = {'message': 'درخواست فروش با موفقیت ثبت شد'}
+            guard.complete(result, reference=f'transaction:{sell_transaction.id}')
+
         logger.info(
             f"Sell order registered | user_id={user_id} asset={asset} "
             f"gold={calculated_price['data']['gold_amount']}g "
             f"total={calculated_price['data']['total_amount']}IRT withdraw={withdraw_method}"
         )
-        return {'message': 'درخواست فروش با موفقیت ثبت شد'}
+        return result
     

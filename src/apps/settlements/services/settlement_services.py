@@ -10,6 +10,8 @@ from apps.exchange.services.wallet_service import WalletService
 from apps.core.utils.date_time_utils import get_date_time
 from apps.core.utils.security_utils import get_client_ip
 from apps.settlements.tasks.settlement_tasks import process_withdrawal_requests
+from apps.core.models.idempotency import IdempotencyRecord
+from apps.core.services.idempotency import IdempotencyService
 from apps.core.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,7 +30,9 @@ class SettlementService:
         )
 
     @staticmethod
-    def initiate_withdrawal_request(amount, card_id, request):
+    def initiate_withdrawal_request(
+        amount, card_id, request, idempotency_key: str | None = None
+    ):
         user_id = request.user.id
         logger.info(
             f"Withdrawal request initiated | user_id={user_id} amount={amount}IRT card_id={card_id}"
@@ -38,7 +42,25 @@ class SettlementService:
         timestamp = get_date_time()['timestamp']
 
         with transaction.atomic():
-            # Customer row lock first (same ordering as ExchangeService) so a
+            # Idempotency claim before the customer lock — the same ordering
+            # every financial endpoint uses, so two requests sharing a key can
+            # never queue on these two locks in opposite orders. The claim
+            # commits with the debit below, so a duplicate that arrives after
+            # this transaction replays instead of withdrawing twice.
+            guard = IdempotencyService.acquire(
+                user_id=user_id,
+                endpoint=IdempotencyRecord.Endpoint.WITHDRAW,
+                key=idempotency_key,
+                params={'amount': amount, 'card_id': card_id},
+            )
+            if guard.replayed:
+                logger.info(
+                    f"Withdrawal replayed from idempotency key | user_id={user_id} "
+                    f"reference={guard.record.reference or '-'}"
+                )
+                return guard.response
+
+            # Customer row lock (same ordering as ExchangeService) so a
             # concurrent buy/sell/withdrawal of this customer cannot interleave
             # between the balance check and the wallet debit below.
             customer = Customer.objects.select_for_update().get(user_id=user_id)
@@ -85,6 +107,11 @@ class SettlementService:
                 desc=f'بابت درخواست برداشت به شماره: {withdrawal.id}',
                 ip=customer_ip,
                 timestamp=timestamp
+            )
+
+            guard.complete(
+                {"message": "درخواست برداشت با موفقیت ثبت شد"},
+                reference=f'withdrawal:{withdrawal.id}',
             )
 
         logger.info(
