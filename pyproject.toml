@@ -77,3 +77,10 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+
+[tool.ruff]
+# Generated migration files are historical records: they are rewritten only by
+# `makemigrations`, never edited by hand, so formatting them adds thousands of
+# lines of diff noise for no benefit.
+extend-exclude = ["**/migrations/*"]
