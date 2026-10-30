@@ -1,7 +1,7 @@
 from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticated
+from apps.accounts.api.permissions.user_permissions import IsTwoFactorAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -18,7 +18,7 @@ from apps.core.utils.openapi_params import IDEMPOTENCY_KEY_PARAMETER
 
 
 class GetBalanceApiView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
 
     @extend_schema(
         summary="Get User Wallets",
@@ -86,7 +86,7 @@ class GetBalanceApiView(APIView):
 
 class BuyApiView(APIView):
     
-    permission_classes = [IsAuthenticated, IsCustomerAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated, IsCustomerAuthenticated]
 
     @extend_schema(
         summary="Buy Asset",
@@ -157,7 +157,7 @@ class BuyApiView(APIView):
     }
 )
 class GetTransactionListApiview(ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
     pagination_class = StandardResultsSetPagination
 
     def get_serializer_class(self):
@@ -211,7 +211,7 @@ class GetTransactionListApiview(ListAPIView):
     }
 )
 class GetInvoiceListApiView(ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
     pagination_class = StandardResultsSetPagination
     serializer_class = InvoiceListSerializer
 
@@ -224,7 +224,7 @@ class GetInvoiceListApiView(ListAPIView):
     
 class SellApiView(APIView):
     
-    permission_classes = [IsAuthenticated, IsCustomerAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated, IsCustomerAuthenticated]
 
     @extend_schema(
         summary="Sell Asset",

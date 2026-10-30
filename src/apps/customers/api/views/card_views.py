@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from apps.accounts.api.permissions.user_permissions import IsTwoFactorAuthenticated
 
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse
 
@@ -22,7 +22,7 @@ from apps.core.exceptions.open_api import ErrorSerializer
     )
 )
 class BankCardListApiView(ListAPIView):
-    permission_classes = [IsAuthenticated, IsCustomerAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated, IsCustomerAuthenticated]
     serializer_class = BankCardResponseSerializer
     pagination_class = StandardResultsSetPagination
 
@@ -34,7 +34,7 @@ class BankCardListApiView(ListAPIView):
 
 class CreateBankCardApiView(APIView):
 
-    permission_classes = [IsAuthenticated, IsCustomerAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated, IsCustomerAuthenticated]
 
     @extend_schema(
         summary="Create user bank card",
@@ -87,7 +87,7 @@ class CreateBankCardApiView(APIView):
 
 class DeleteBankCardApiView(APIView):
 
-    permission_classes = [IsAuthenticated, IsCustomerAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated, IsCustomerAuthenticated]
 
     @extend_schema(
         summary="Delete bank card",

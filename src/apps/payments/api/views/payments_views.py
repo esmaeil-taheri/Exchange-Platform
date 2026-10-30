@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from apps.accounts.api.permissions.user_permissions import IsTwoFactorAuthenticated
 
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
@@ -52,7 +52,7 @@ class ZarinpalCallbackApiView(APIView):
 
 class DepositApiView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
 
     @extend_schema(
         summary="Deposit funds",

@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from apps.accounts.api.permissions.user_permissions import IsTwoFactorAuthenticated
 
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 
@@ -19,7 +19,7 @@ from apps.core.decorators.rate_limit import rate_limit
 
 class GetCustomerProfile(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
 
     @extend_schema(
         summary="Get customer's profile",
@@ -73,7 +73,7 @@ class GetCustomerProfile(APIView):
 
 class GetCustomerKycStatus(APIView):
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
 
     @extend_schema(
         summary="Get user's kyc status",
@@ -120,7 +120,7 @@ class GetCustomerKycStatus(APIView):
 
 class CustomerIdentityInquiryApiView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
 
     @extend_schema(
         summary="Inquiry customer identity",
@@ -171,7 +171,7 @@ class CustomerIdentityInquiryApiView(APIView):
     
 
 class CustomerKycUploadDocApiView(APIView):
-    permission_classes = [CanUploadKycDocument, IsAuthenticated]
+    permission_classes = [CanUploadKycDocument, IsTwoFactorAuthenticated]
 
     @extend_schema(
         summary="Upload national card image for Kyc",

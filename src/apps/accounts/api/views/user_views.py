@@ -2,6 +2,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from apps.accounts.api.permissions.user_permissions import IsTwoFactorAuthenticated
 
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
@@ -9,11 +10,23 @@ from apps.accounts.api.serializers.user_serializers import (
     MessageResponseSerializer, Change2FAStatusSerializer, 
     LoginRegisterSerializer, LoginRegisterVerifySerializer,
     OtpSendResponseSerializer, LoginRegisterVerifyResponseSerializer, 
-    TwoFaUriSerializer, Verify2faAccessSerializer
+    TwoFaUriSerializer, Verify2faAccessSerializer,
+    VerifyLogin2FASerializer
 )
 from apps.core.exceptions.open_api import ErrorSerializer
 from apps.accounts.services.user_services import UserService
 from apps.core.decorators.rate_limit import rate_limit
+
+
+class VerifyLogin2FAApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Accounts'], request=VerifyLogin2FASerializer, responses=MessageResponseSerializer)
+    @rate_limit(scope='login_2fa_verify', limit=5, window=300, key='user')
+    def post(self, request):
+        serializer = VerifyLogin2FASerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.save())
 
 
 class LoginRegisterApiView(APIView):
@@ -124,7 +137,7 @@ class LoginRegisterVerifyApiView(APIView):
 
 class Get2FAUriApiView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
 
     @extend_schema(
         summary="Get 2FA setup URI",
@@ -140,7 +153,7 @@ class Get2FAUriApiView(APIView):
 
 class Verify2FAAccessApiView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
 
     @extend_schema(
     summary="Send OTP for Change 2FA Status",
@@ -189,7 +202,7 @@ class Verify2FAAccessApiView(APIView):
 
 class Change2FAStatusApiView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
 
     @extend_schema(
     summary="Change 2FA Status",

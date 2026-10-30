@@ -1,6 +1,6 @@
 from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from apps.accounts.api.permissions.user_permissions import IsTwoFactorAuthenticated
 from rest_framework.views import Response
 from rest_framework import status
 
@@ -22,7 +22,7 @@ from apps.core.pagination import StandardResultsSetPagination
 
 class GetNotificationsListApiView(ListAPIView):
     serializer_class = NotificationListResponseSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
@@ -32,7 +32,7 @@ class GetNotificationsListApiView(ListAPIView):
     
 
 class ReadNotificationApiView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
     
     @extend_schema(
         summary="Mark a notification as read",

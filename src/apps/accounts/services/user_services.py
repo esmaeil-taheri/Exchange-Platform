@@ -36,6 +36,14 @@ class UserService:
     otp_provider = SmsIrProvider()
 
     @staticmethod
+    def verify_login_2fa(*, user: CustomUser, authenticator_code: str) -> dict:
+        if not user.totp_secret or not pyotp.TOTP(user.totp_secret).verify(authenticator_code):
+            raise InvalidTwoFactorCode("Invalid authenticator code.")
+        user.requires_2fa = False
+        user.save(update_fields=["requires_2fa"])
+        return {"message": "Two-factor authentication verified."}
+
+    @staticmethod
     def login_register(*, phone_number: str) -> dict:
         settings = get_site_settings()
 
@@ -125,7 +133,8 @@ class UserService:
             else:
                 user.last_login = timezone.now()
                 user.last_ip_address = get_client_ip(request)
-                user.save(update_fields=['last_login', 'last_ip_address'])
+                user.requires_2fa = user.is_2fa_enabled
+                user.save(update_fields=['last_login', 'last_ip_address', 'requires_2fa'])
                 login_detected.send(sender=CustomUser, user=user)
                 logger.info(
                     f"User logged in | user_id={user.id} "
@@ -226,7 +235,8 @@ class UserService:
             user.is_2fa_enabled = False
             logger.info(f"2FA disabled | user_id={user.id}")
 
-        user.save(update_fields=["is_2fa_enabled"])
+        user.requires_2fa = False
+        user.save(update_fields=["is_2fa_enabled", "requires_2fa"])
         otp_cache.delete(cache_key)
 
         return {'message': 'وضعیت با موفقیت تغییر یافت'}

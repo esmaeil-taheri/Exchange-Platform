@@ -83,3 +83,14 @@ class Change2FAStatusSerializer(serializers.Serializer):
 
 class MessageResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
+
+
+class VerifyLogin2FASerializer(serializers.Serializer):
+    authenticator_code = serializers.RegexField(r"^[0-9]{6}$")
+
+    def create(self, validated_data):
+        return UserService.verify_login_2fa(
+            user=self.context["request"].user, **validated_data
+        )
+
+

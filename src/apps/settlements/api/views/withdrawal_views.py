@@ -1,6 +1,6 @@
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from apps.accounts.api.permissions.user_permissions import IsTwoFactorAuthenticated
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework import status
@@ -69,7 +69,7 @@ class WithdrawalListApiView(ListAPIView):
 
     Supports filtering by status and custom ordering.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
     serializer_class = WithdrawalSerializer
     pagination_class = StandardResultsSetPagination
     # filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -124,7 +124,7 @@ class WithdrawalDetailApiView(RetrieveAPIView):
 
     Only allows access to withdrawals belonging to the authenticated customer.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated]
     serializer_class = WithdrawalSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'withdrawal_id'
@@ -151,7 +151,7 @@ class CreateWithdrawalRequest(APIView):
     # Same guard as BuyApiView / SellApiView: money leaving the platform must be
     # at least as protected as money moving inside it. IsCustomerAuthenticated
     # rejects both suspended and not-yet-verified (preregister) customers.
-    permission_classes = [IsAuthenticated, IsCustomerAuthenticated]
+    permission_classes = [IsTwoFactorAuthenticated, IsCustomerAuthenticated]
 
     @extend_schema(
         summary="Create withdrawal request",

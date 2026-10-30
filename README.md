@@ -19,6 +19,18 @@
 
 ## Table of Contents
 
+### Login with 2FA
+
+When login returns `two_fa_enabled: true`, use the returned access token to
+POST `{"authenticator_code": "123456"}` to
+`/api/v1/authentication/2fa/login/verify/`. Login sets `requires_2fa` when
+`is_2fa_enabled` is true; verification clears `requires_2fa` and returns a
+confirmation message. Keep using the original access and refresh tokens.
+Protected APIs return 403 while both flags are true. Users without 2FA keep
+the existing login flow. This flag is account-wide: verification unlocks all
+sessions, and a new login requires verification again across all sessions.
+Verification is limited to five attempts per five minutes per user.
+
 - [Overview](#-overview)
 - [Architecture](#-architecture)
 - [Technology Stack](#-technology-stack)

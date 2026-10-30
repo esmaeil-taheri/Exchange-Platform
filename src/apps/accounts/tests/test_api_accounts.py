@@ -251,6 +251,11 @@ class TestChange2FAStatusApi:
         user.save()
         caches['otp'].set(f'2fa:{EXISTING_PHONE}', '123456')
 
+        verified = auth_client.post('/api/v1/authentication/2fa/login/verify/', {
+            'authenticator_code': valid_totp,
+        })
+        assert verified.status_code == 200
+
         response = auth_client.post(self.URL, {
             'code': '123456',
             'authenticator_code': valid_totp,
