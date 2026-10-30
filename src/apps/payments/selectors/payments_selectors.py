@@ -6,7 +6,9 @@ class PaymentsSelectors:
     def get_invoice_by_authority(authority: str):
         
         try:
-            return Invoice.objects.prefetch_related('customer').get(gateway_track_id=authority, status=Invoice.STATUS_CHOICES[0][0])
+            return Invoice.objects.prefetch_related('customer').get(
+                gateway_track_id=authority, status__in=('pending', 'paid')
+            )
         except Invoice.DoesNotExist:
             return None
     

@@ -114,8 +114,8 @@ class PaymentService:
         if verification_result == 101:
             # 101 means Zarinpal already verified this payment, so the money is
             # captured. Reaching here means it was captured but never finalized
-            # on our side — get_invoice_by_authority only returns pending
-            # invoices. That is the crash window between the verify call above
+            # on our side — locally paid invoices already returned above.
+            # That is the crash window between the verify call above
             # and the commit further down (deploy, worker restart, OOM).
             #
             # verify_payment returns only the code on 101, never the card data,

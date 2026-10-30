@@ -60,23 +60,22 @@ class TestZarinpalCallbackIntegration:
         assert invoice.status == Invoice.STATUS_CHOICES[1][0]   # paid
         assert invoice.ref_id == '99999'
 
-    def test_second_callback_after_payment_raises_not_found(
+    def test_second_callback_after_payment_returns_already_paid(
         self, invoice, bank_card, mock_gateway_verify_valid_hash, mock_task_deposit
     ):
         """
-        After a successful callback the invoice status changes from 'pending' to 'paid'.
-        The selector only returns pending invoices, so a second callback raises InvoiceNotFound
-        (the invoice is no longer discoverable via authority lookup).
+        A paid invoice remains discoverable so callback retries are idempotent.
         """
-        from apps.payments.exceptions.payments_exceptions import InvoiceNotFound
 
         PaymentService.handle_zarinpal_callback(AUTHORITY, _make_request())
 
         invoice.refresh_from_db()
         assert invoice.is_paid is True  # first call succeeded
 
-        with pytest.raises(InvoiceNotFound):
-            PaymentService.handle_zarinpal_callback(AUTHORITY, _make_request())
+        result = PaymentService.handle_zarinpal_callback(AUTHORITY, _make_request())
+        assert 'قبلاً' in result['message']
+        mock_gateway_verify_valid_hash.assert_called_once()
+        mock_task_deposit.assert_called_once()
 
 
 # ═════════════════════════════════════════════════════════════════════════════
