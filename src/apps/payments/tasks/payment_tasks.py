@@ -29,6 +29,10 @@ def process_deposit_invoice_task(self, invoice_id):
                 )
                 return f"Invoice {invoice_id} already processed"
 
+            if not invoice.is_paid or invoice.status != 'paid':
+                logger.warning(f"[task=process_deposit] Invoice not paid — skipped | invoice_id={invoice_id}")
+                return f"Invoice {invoice_id} not paid"
+
             Wallet.objects.create(
                 customer=invoice.customer,
                 wallet_type=Wallet.WALLETTYPES[0][0],
@@ -72,6 +76,10 @@ def process_buy_invoice_task(self, invoice_id):
                     f"[task=process_buy] Invoice already processed — skipped | invoice_id={invoice_id}"
                 )
                 return f"Invoice {invoice_id} already processed"
+
+            if not invoice.is_paid or invoice.status != 'paid':
+                logger.warning(f"[task=process_buy] Invoice not paid — skipped | invoice_id={invoice_id}")
+                return f"Invoice {invoice_id} not paid"
 
             # The invoice does not store the quoted gold amount, so it is rebuilt
             # here by inverting the quote. PriceService rounds gold_price_toman

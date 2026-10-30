@@ -77,6 +77,7 @@ class TestHandleZarinpalCallback:
 
         invoice.refresh_from_db()
         assert invoice.status == Invoice.STATUS_CHOICES[3][0]  # rejected
+
         assert 'zarinpal_101' in invoice.gateway_response
         assert str(invoice.id) in result['message']
         assert 'پشتیبانی' in result['message']
@@ -140,6 +141,16 @@ class TestHandleZarinpalCallback:
         invoice.refresh_from_db()
         assert invoice.is_paid is False
         assert invoice.status == Invoice.STATUS_CHOICES[3][0]  # rejected
+        mock_task_deposit.assert_not_called()
+
+    def test_invalid_card_buy_does_not_queue_processing(
+        self, buy_invoice, bank_card, mock_gateway_verify_invalid_card, mock_task_buy
+    ):
+        PaymentService.handle_zarinpal_callback(buy_invoice.gateway_track_id, self._make_request())
+        buy_invoice.refresh_from_db()
+        assert buy_invoice.is_paid is False
+        assert buy_invoice.status == 'rejected'
+        mock_task_buy.assert_not_called()
 
     def test_deposit_invoice_queues_deposit_task(
         self, invoice, bank_card, mock_gateway_verify_valid_hash, mock_task_deposit

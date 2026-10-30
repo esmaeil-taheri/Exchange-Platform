@@ -30,6 +30,9 @@ def currency_xau(db):
 class TestProcessDepositInvoiceTask:
 
     def test_process_deposit_invoice_success(self, customer, invoice):
+        invoice.is_paid = True
+        invoice.status = 'paid'
+        invoice.save(update_fields=['is_paid', 'status'])
         res = process_deposit_invoice_task(invoice.id)
         assert "Wallet charged successfully" in res
 
@@ -46,6 +49,9 @@ class TestProcessDepositInvoiceTask:
         assert wallet.is_verified is True
 
     def test_process_deposit_invoice_idempotency(self, customer, invoice):
+        invoice.is_paid = True
+        invoice.status = 'paid'
+        invoice.save(update_fields=['is_paid', 'status'])
         # First execution
         res1 = process_deposit_invoice_task(invoice.id)
         assert "Wallet charged successfully" in res1
@@ -67,6 +73,9 @@ class TestProcessDepositInvoiceTask:
 class TestProcessBuyInvoiceTask:
 
     def test_process_buy_invoice_success_decimal_precision(self, customer, buy_invoice, currency_xau):
+        buy_invoice.is_paid = True
+        buy_invoice.status = 'paid'
+        buy_invoice.save(update_fields=['is_paid', 'status'])
         # buy_invoice has total_price=5_000_000, unit_price=1_000_000, fee=50_000, maintenance_fee=10_000
         # total_net = 5_000_000 - 60_000 = 4_940_000
         # gold_amount = 4.9400
@@ -90,6 +99,9 @@ class TestProcessBuyInvoiceTask:
         assert txn.deposit_method == Transaction.DEPOSITTYPES[1][0]       # gate
 
     def test_process_buy_invoice_idempotency(self, customer, buy_invoice, currency_xau):
+        buy_invoice.is_paid = True
+        buy_invoice.status = 'paid'
+        buy_invoice.save(update_fields=['is_paid', 'status'])
         res1 = process_buy_invoice_task(buy_invoice.id)
         assert "Asset purchase created" in res1
 
@@ -98,6 +110,31 @@ class TestProcessBuyInvoiceTask:
 
         txn_count = Transaction.objects.filter(invoice=buy_invoice).count()
         assert txn_count == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize('invoice_fixture,task', [
+    ('invoice', process_deposit_invoice_task),
+    ('buy_invoice', process_buy_invoice_task),
+])
+@pytest.mark.parametrize('status,is_paid', [
+    ('pending', False), ('failed', False), ('rejected', False), ('paid', False),
+    ('pending', True), ('failed', True), ('rejected', True),
+])
+def test_workers_skip_unaccepted_invoices(request, customer, currency_xau, invoice_fixture, task, status, is_paid):
+    invoice = request.getfixturevalue(invoice_fixture)
+    invoice.status = status
+    invoice.is_paid = is_paid
+    invoice.save(update_fields=['status', 'is_paid'])
+    wallet_count = Wallet.objects.filter(customer=customer).count()
+
+    assert 'not paid' in task(invoice.id)
+
+    invoice.refresh_from_db()
+    assert invoice.is_processed is False
+    assert invoice.processed_at is None
+    assert Wallet.objects.filter(customer=customer).count() == wallet_count
+    assert not Transaction.objects.filter(invoice=invoice).exists()
 
 
 @pytest.mark.django_db

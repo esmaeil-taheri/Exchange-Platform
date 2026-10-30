@@ -243,6 +243,9 @@ class PaymentService:
                 'ref_id'
             ])
         
+        if not invoice.is_paid or invoice.status != 'paid':
+            return {'message': message}
+
         try:
             if invoice.invoice_type == Invoice.INVOICE_TYPES[0][0]:  # deposit
                 process_deposit_invoice_task.apply_async(
